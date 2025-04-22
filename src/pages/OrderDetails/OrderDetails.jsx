@@ -1,10 +1,11 @@
 import React, { useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Divider, Table, Typography } from "antd";
+import { Divider, Table, Typography, Button, Space } from "antd";
 import { formatCurrency, timeTranformFromMongoDB } from "../../utils/utils";
 import { useQuery } from "@tanstack/react-query";
 import { handleGetAccessToken } from "../../services/axiosJWT";
 import orderService from "../../services/orderService";
+import ReviewButton from "../../components/ReviewButton/ReviewButton";
 const { Title } = Typography;
 
 function OrderDetails() {
@@ -90,6 +91,23 @@ function OrderDetails() {
                     {formatCurrency(record?.price * record?.quantity)}
                     <sup>₫</sup>
                 </div>
+            ),
+        },
+        {
+            title: "Thao tác",
+            key: "action",
+            render: (text, record) => (
+                <Space size="middle">
+                    {order?.shippingStatus === "Completed" && (
+                        <ReviewButton product={record.product} orderId={orderId} />
+                    )}
+                    <Button 
+                        type="primary"
+                        onClick={() => handleProductDetails(record?.product?._id)}
+                    >
+                        Mua lại
+                    </Button>
+                </Space>
             ),
         },
     ];

@@ -4,15 +4,18 @@ import { useParams } from 'react-router-dom';
 import productService from '../../services/productService';
 import productDetailService from '../../services/productDetailService';
 import { FaChevronLeft, FaChevronRight, FaShoppingCart, FaTruck, FaCheck, FaBox, FaInfoCircle, FaBolt, FaMicrochip, FaCamera, FaBatteryFull, FaMobileAlt } from 'react-icons/fa';
-import { Tabs, Collapse, message, Spin, Badge, Divider } from 'antd';
-import { useMutation } from '@tanstack/react-query';
+import { Tabs, Collapse, message, Spin, Badge, Divider, Breadcrumb, Card, Carousel, List, Button, Rate, Input, Modal, notification } from 'antd';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { handleGetAccessToken } from '../../services/axiosJWT';
 import cartService from '../../services/cartService';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setCart } from '../../redux/cartSlice';
+import ProductReviews from "../../components/ProductReviews/ProductReviews";
+import ReviewForm from "../../components/ReviewForm/ReviewForm";
 
 const { TabPane } = Tabs;
 const { Panel } = Collapse;
+const { TextArea } = Input;
 
 const ProductDetail = () => {
     const { productId } = useParams();
@@ -21,6 +24,10 @@ const ProductDetail = () => {
     const [productDetail, setProductDetail] = useState(null);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [fade, setFade] = useState(false);
+    const user = useSelector((state) => state.user.user);
+    const [reviewModal, setReviewModal] = useState(false);
+    const [userReviewData, setUserReviewData] = useState(null);
+    const queryClient = useQueryClient();
 
     const mutationAddToCart = useMutation({
         mutationFn: () => {
@@ -52,6 +59,29 @@ const ProductDetail = () => {
 
         fetchData();
     }, [productId]);
+
+    // Kiểm tra người dùng đã đánh giá sản phẩm chưa
+    useEffect(() => {
+        if (user && product) {
+            checkUserReviewStatus();
+        }
+    }, [user, product]);
+
+    const checkUserReviewStatus = async () => {
+        try {
+            const accessToken = handleGetAccessToken();
+            const response = await axios.get(
+                `${import.meta.env.VITE_API_URL}/review/user-can-review`,
+                {
+                    params: { productId: productId },
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                }
+            );
+            setUserReviewData(response.data);
+        } catch (error) {
+            console.error("Lỗi kiểm tra trạng thái đánh giá:", error);
+        }
+    };
 
     const handleNextImage = () => {
         if (product && product?.imageUrl) {
@@ -96,10 +126,86 @@ const ProductDetail = () => {
     const savingAmount = product?.originalPrice - product?.price;
     const savingPercentage = Math.round((savingAmount / product?.originalPrice) * 100);
 
+    const handleOpenReviewModal = () => {
+        if (!user) {
+            notification.warning({
+                message: 'Cần đăng nhập',
+                description: 'Vui lòng đăng nhập để đánh giá sản phẩm'
+            });
+            return;
+        }
+        setReviewModal(true);
+    };
+
+    const handleCloseReviewModal = () => {
+        setReviewModal(false);
+        // Refresh trạng thái đánh giá
+        checkUserReviewStatus();
+    };
+
+    if (isPending) {
+        return <Spin size="large" className="flex justify-center items-center min-h-screen" />;
+    }
+
+    if (!product) {
+        return <div className="text-center p-8">Không tìm thấy sản phẩm</div>;
+    }
+
+    // Chuẩn bị dữ liệu cho modal đánh giá
+    let reviewModalProps = {};
+    if (userReviewData) {
+        if (userReviewData.hasReviewed) {
+            // Người dùng đã đánh giá, lấy thông tin đánh giá để chỉnh sửa
+            const fetchUserReview = async () => {
+                try {
+                    const accessToken = handleGetAccessToken();
+                    const response = await axios.get(
+                        `${import.meta.env.VITE_API_URL}/review/user-product/${productId}`,
+                        {
+                            headers: { Authorization: `Bearer ${accessToken}` }
+                        }
+                    );
+                    return response.data.data;
+                } catch (error) {
+                    console.error("Lỗi lấy thông tin đánh giá:", error);
+                    return null;
+                }
+            };
+
+            reviewModalProps = {
+                product: product,
+                orderId: userReviewData.orderId,
+                reviewId: userReviewData.reviewId,
+                isEdit: true,
+                initialValues: null, // Sẽ được cập nhật khi lấy dữ liệu đánh giá
+                onFetchReview: fetchUserReview
+            };
+        } else if (userReviewData.canReview) {
+            // Người dùng có thể đánh giá mới
+            reviewModalProps = {
+                product: product,
+                orderId: userReviewData.orderId,
+                isEdit: false
+            };
+        }
+    }
+
+    // Đường dẫn ảnh chính
+    const mainImageUrl = product.imageUrl[selectedImageIndex];
+
     return (
         <Spin spinning={isPending} tip="Đang xử lý..." className="text-gray-100">
             <div className='bg-gray-900 min-h-screen'>
                 <div className='max-w-screen-xl mx-auto p-4 sm:p-6'>
+                    <Breadcrumb
+                        className="mb-4"
+                        items={[
+                            { title: 'Trang chủ' },
+                            { title: product.category },
+                            { title: product.name },
+                        ]}
+                    />
+
                     {/* Product Overview Section */}
                     <div className='bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700'>
                         <div className='flex flex-col md:flex-row'>
@@ -110,7 +216,7 @@ const ProductDetail = () => {
                                         <div className={`flex-grow transition-all duration-500 ${fade ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
                                             <div className="relative group flex items-center justify-center py-4 px-8 mt-4">
                                                 <img
-                                                    src={product?.imageUrl[selectedImageIndex]}
+                                                    src={mainImageUrl}
                                                     alt={product?.name}
                                                     className="rounded-xl shadow-xl object-contain h-[500px] max-h-full"
                                                 />
@@ -373,22 +479,55 @@ const ProductDetail = () => {
                         </div>
                     </div>
 
-                    {/* Reviews section - simplified */}
-                    <div className="mt-8 bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700">
+                    {/* Phần đánh giá sản phẩm */}
+                    <div className="bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 my-8">
                         <div className="p-6">
-                            <h2 className="text-2xl font-bold mb-6 text-center text-orange-400">
-                                Đánh giá sản phẩm
-                            </h2>
-                            <div className="text-center p-8">
-                                <p className="text-gray-300">Sản phẩm chưa có đánh giá.</p>
-                                <button className="mt-4 bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg border border-gray-600 transition-all">
-                                    Viết đánh giá
-                                </button>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold text-white">
+                                    Đánh giá sản phẩm
+                                </h2>
+                                {user && (
+                                    <button
+                                        className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center space-x-2 transition"
+                                        onClick={handleOpenReviewModal}
+                                        disabled={userReviewData && !userReviewData.canReview && !userReviewData.hasReviewed}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                        <span>{userReviewData?.hasReviewed ? 'Chỉnh sửa đánh giá' : 'Viết đánh giá'}</span>
+                                    </button>
+                                )}
                             </div>
+                            <ProductReviews productId={productId} />
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Modal đánh giá sản phẩm */}
+            {reviewModalProps.product && (
+                <Modal
+                    title={reviewModalProps.isEdit ? "Chỉnh sửa đánh giá" : "Đánh giá sản phẩm"}
+                    open={reviewModal}
+                    onCancel={handleCloseReviewModal}
+                    footer={null}
+                    width={600}
+                >
+                    <ReviewForm
+                        product={reviewModalProps.product}
+                        orderId={reviewModalProps.orderId}
+                        reviewId={reviewModalProps.reviewId}
+                        isEdit={reviewModalProps.isEdit}
+                        initialValues={reviewModalProps.initialValues}
+                        onClose={handleCloseReviewModal}
+                        onSuccess={() => {
+                            queryClient.invalidateQueries(['product-reviews', productId]);
+                            queryClient.invalidateQueries(['user-can-review', productId]);
+                        }}
+                    />
+                </Modal>
+            )}
         </Spin>
     );
 };
