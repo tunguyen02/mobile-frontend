@@ -22,3 +22,58 @@
   margin: 0;
   padding: 0;
 }
+
+/* Hiệu ứng nút chat bong bóng */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 0.5s ease infinite;
+}
+
+/* Hiệu ứng bóng mờ khi hover */
+.chat-button-shadow {
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 16px 0 rgba(0, 118, 255, 0.5) !important;
+  position: relative;
+}
+
+.chat-button-shadow:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px 0 rgba(0, 118, 255, 0.6) !important;
+}
+
+/* Hiệu ứng glow cho nút chat */
+.chat-button-shadow::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 137, 255, 0.4) 0%, rgba(46, 137, 255, 0) 70%);
+  z-index: -1;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.05);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+}

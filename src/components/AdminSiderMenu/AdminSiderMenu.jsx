@@ -8,7 +8,8 @@ import {
     ShoppingCartOutlined,
     ShoppingOutlined,
     UserOutlined,
-    CarryOutOutlined
+    CarryOutOutlined,
+    MessageOutlined
 } from "@ant-design/icons";
 
 const AdminSiderMenu = () => {
@@ -51,6 +52,10 @@ const AdminSiderMenu = () => {
 
                 <Menu.Item key="5" icon={<UserOutlined />}>
                     <Link to="/admin/users">Users</Link>
+                </Menu.Item>
+
+                <Menu.Item key="6" icon={<MessageOutlined />}>
+                    <Link to="/admin/chat">Chat</Link>
                 </Menu.Item>
             </Menu>
         </div>

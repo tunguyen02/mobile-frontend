@@ -19,6 +19,7 @@ import MyOrders from "../pages/MyOrders/MyOrders";
 import OrderDetails from "../pages/OrderDetails/OrderDetails";
 import ForgotPassword from "../pages/ForgotPassword/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword/ResetPassword";
+import AdminChat from "../pages/AdminPage/AdminChat";
 
 export const routes = [
     {
@@ -94,6 +95,11 @@ export const routes = [
     {
         path: '/admin/users',
         page: Users,
+        adminManage: true
+    },
+    {
+        path: '/admin/chat',
+        page: AdminChat,
         adminManage: true
     },
     {

@@ -14,7 +14,7 @@ const ProductReviews = ({ productId }) => {
     const [limit, setLimit] = useState(5);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [currentReview, setCurrentReview] = useState(null);
-    const user = useSelector((state) => state.user.user);
+    const user = useSelector((state) => state.user);
 
     // Lấy danh sách đánh giá sản phẩm
     const { data, isLoading, refetch } = useQuery({
@@ -90,11 +90,11 @@ const ProductReviews = ({ productId }) => {
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
-                <Title level={3} className="text-white m-0">Đánh giá sản phẩm</Title>
+                {/* <Title level={3} style={{ color: '#ffffff', margin: 0 }}>Đánh giá sản phẩm</Title> */}
                 <div>
                     <Rate disabled allowHalf value={averageRating} className="text-yellow-500" />
-                    <Text className="ml-2 text-white">{averageRating.toFixed(1)}/5</Text>
-                    <Text className="ml-2 text-gray-400">({pagination.total} đánh giá)</Text>
+                    <Text style={{ marginLeft: '8px', color: '#ffffff' }}>{averageRating.toFixed(1)}/5</Text>
+                    <Text style={{ marginLeft: '8px', color: '#a0aec0' }}>({pagination.total} đánh giá)</Text>
                 </div>
             </div>
 
@@ -113,7 +113,7 @@ const ProductReviews = ({ productId }) => {
                                         />
                                         <div className="ml-3">
                                             <div className="flex items-center">
-                                                <Text strong className="text-white">{review.user.name}</Text>
+                                                <Text strong style={{ color: '#ffffff' }}>{review.user.name}</Text>
                                                 {review.isVerifiedPurchase && (
                                                     <Tag color="green" className="ml-2 text-xs">Đã mua hàng</Tag>
                                                 )}
@@ -122,17 +122,18 @@ const ProductReviews = ({ productId }) => {
                                         </div>
                                     </div>
                                     
-                                    <div className="text-white my-3">{review.content}</div>
+                                    <div style={{ color: '#ffffff', margin: '12px 0' }}>{review.content}</div>
                                     
                                     <div className="flex justify-between items-center mt-2">
-                                        <Text className="text-gray-400">{formatDate(review.createdAt)}</Text>
+                                        <Text style={{ color: '#a0aec0' }}>{formatDate(review.createdAt)}</Text>
                                         {isCurrentUserReview && (
                                             <Button 
                                                 type="primary" 
                                                 size="small"
                                                 icon={<EditOutlined />} 
                                                 onClick={() => handleEditReview(review)}
-                                                className="bg-blue-600 hover:bg-blue-700 border-0"
+                                                style={{ backgroundColor: '#2563eb', borderColor: '#2563eb' }}
+                                                className="hover:bg-blue-700"
                                             >
                                                 Chỉnh sửa
                                             </Button>
@@ -150,12 +151,11 @@ const ProductReviews = ({ productId }) => {
                             pageSize={limit}
                             onChange={handlePageChange}
                             showSizeChanger={false}
-                            className="text-white"
                         />
                     </div>
                 </>
             ) : (
-                <Empty description={<span className="text-gray-400">Sản phẩm chưa có đánh giá nào</span>} />
+                <Empty description={<span style={{ color: '#a0aec0' }}>Sản phẩm chưa có đánh giá nào</span>} />
             )}
 
             {/* Modal chỉnh sửa đánh giá */}

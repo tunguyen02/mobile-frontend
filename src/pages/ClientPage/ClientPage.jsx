@@ -8,6 +8,7 @@ import userService from '../../services/userService';
 import { handleGetAccessToken } from '../../services/axiosJWT';
 import cartService from '../../services/cartService';
 import { setCart } from '../../redux/cartSlice';
+import ChatWidget from '../../components/Chat/ChatWidget';
 
 function ClientPage({ children }) {
     const { pathname } = useLocation();
@@ -49,6 +50,7 @@ function ClientPage({ children }) {
             <HeaderNavbar />
             {children}
             <Footer />
+            <ChatWidget />
         </div>
     )
 }

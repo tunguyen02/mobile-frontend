@@ -137,6 +137,16 @@ const userService = {
             }
         );
         return response.data;
+    },
+
+    getAdminId: async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/user/admin-id`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching admin ID:', error.response || error);
+            throw new Error(error.response?.data?.message || 'Error fetching admin ID');
+        }
     }
 }
 
