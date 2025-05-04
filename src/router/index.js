@@ -19,6 +19,7 @@ import MyOrders from "../pages/MyOrders/MyOrders";
 import OrderDetails from "../pages/OrderDetails/OrderDetails";
 import ForgotPassword from "../pages/ForgotPassword/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword/ResetPassword";
+import FlashSales from "../pages/AdminPage/FlashSales";
 
 export const routes = [
     {
@@ -104,6 +105,11 @@ export const routes = [
     {
         path: '/admin/products/specifications/:productId',
         page: ProductSpecifications,
+        adminManage: true
+    },
+    {
+        path: '/admin/flash-sales',
+        page: FlashSales,
         adminManage: true
     },
     {
