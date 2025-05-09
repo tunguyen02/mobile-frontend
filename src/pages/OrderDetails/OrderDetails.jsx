@@ -1,11 +1,12 @@
 import React, { useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Divider, Table, Typography, Button, Space } from "antd";
+import { Divider, Table, Typography, Button, Space, Tag } from "antd";
 import { formatCurrency, timeTranformFromMongoDB } from "../../utils/utils";
 import { useQuery } from "@tanstack/react-query";
 import { handleGetAccessToken } from "../../services/axiosJWT";
 import orderService from "../../services/orderService";
 import ReviewButton from "../../components/ReviewButton/ReviewButton";
+import { ThunderboltOutlined } from "@ant-design/icons";
 const { Title } = Typography;
 
 function OrderDetails() {
@@ -59,6 +60,11 @@ function OrderDetails() {
                             {record.product.name}
                         </div>
                         <div className="text-gray-500">{record.product.color}</div>
+                        {record.isFlashSale && (
+                            <Tag color="orange" className="mt-1">
+                                <ThunderboltOutlined /> Flash Sale
+                            </Tag>
+                        )}
                     </div>
                 </div>
             ),
@@ -101,7 +107,7 @@ function OrderDetails() {
                     {order?.shippingStatus === "Completed" && (
                         <ReviewButton product={record.product} orderId={orderId} />
                     )}
-                    <Button 
+                    <Button
                         type="primary"
                         onClick={() => handleProductDetails(record?.product?._id)}
                     >

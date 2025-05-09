@@ -12,9 +12,10 @@ import {
     Radio,
     message,
     Spin,
+    Tag,
 } from "antd";
 import addressVietNam from "../../constants/addressConstants";
-import { CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { useDispatch, useSelector } from "react-redux";
 import { useMutation } from "@tanstack/react-query";
 import cartService from "../../services/cartService";
@@ -29,6 +30,89 @@ const CartPage = () => {
     const cart = useSelector((state) => state.cart);
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const [flashSaleProducts, setFlashSaleProducts] = useState({});
+
+    // Kiểm tra các sản phẩm Flash Sale từ localStorage
+    useEffect(() => {
+        const flashSaleItems = {};
+
+        if (cart?.products) {
+            cart.products.forEach(item => {
+                const productId = item?.product?._id;
+                if (productId) {
+                    try {
+                        // Lấy thông tin Flash Sale từ localStorage
+                        const flashSaleData = localStorage.getItem(`flashSale_${productId}`);
+                        if (flashSaleData) {
+                            const parsedData = JSON.parse(flashSaleData);
+
+                            // Kiểm tra nếu Flash Sale còn hiệu lực
+                            const now = new Date().getTime();
+                            const endTime = parsedData.endTime ? new Date(parsedData.endTime).getTime() : 0;
+
+                            if (endTime > now) {
+                                flashSaleItems[productId] = parsedData;
+                            } else {
+                                // Xóa Flash Sale hết hạn
+                                localStorage.removeItem(`flashSale_${productId}`);
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Lỗi khi đọc thông tin Flash Sale:", error);
+                    }
+                }
+            });
+        }
+
+        setFlashSaleProducts(flashSaleItems);
+    }, [cart]);
+
+    // Cập nhật giỏ hàng với thông tin giá Flash Sale
+    useEffect(() => {
+        if (Object.keys(flashSaleProducts).length > 0 && cart?.products?.length > 0) {
+            let needsUpdate = false;
+            const updatedProducts = cart.products.map(item => {
+                const productId = item?.product?._id;
+                if (productId && flashSaleProducts[productId]) {
+                    needsUpdate = true;
+                    // Không thay đổi giá gốc, chỉ đánh dấu sản phẩm là Flash Sale
+                    const product = {
+                        ...item.product,
+                        isFlashSale: true,
+                        flashSaleId: flashSaleProducts[productId].flashSaleId
+                    };
+
+                    return {
+                        ...item,
+                        product
+                    };
+                }
+                return item;
+            });
+
+            if (needsUpdate) {
+                // Tính lại tổng giá với giá Flash Sale
+                const totalPrice = updatedProducts.reduce((total, item) => {
+                    const productId = item?.product?._id;
+                    if (productId && flashSaleProducts[productId]) {
+                        // Sử dụng giá Flash Sale cho tính tổng
+                        return total + (flashSaleProducts[productId].discountPrice * item.quantity);
+                    }
+                    // Sử dụng giá thường
+                    return total + (item.product.price * item.quantity);
+                }, 0);
+
+                // Cập nhật giỏ hàng trong Redux
+                const updatedCart = {
+                    ...cart,
+                    products: updatedProducts,
+                    totalPrice
+                };
+
+                dispatch(setCart(updatedCart));
+            }
+        }
+    }, [flashSaleProducts, dispatch]);
 
     const formRef = useRef(null); // Ref để truy cập Form
     useEffect(() => {
@@ -107,9 +191,9 @@ const CartPage = () => {
 
     //Create order
     const createOrderMutation = useMutation({
-        mutationFn: async ({ shippingInfo, paymentMethod }) => {
+        mutationFn: async ({ shippingInfo, paymentMethod, cartWithFlashSale }) => {
             const accessToken = handleGetAccessToken();
-            return orderService.createOrder(accessToken, shippingInfo, paymentMethod);
+            return orderService.createOrder(accessToken, shippingInfo, paymentMethod, cartWithFlashSale);
         },
         onSuccess: (data) => {
             message.success(data?.message, 3);
@@ -150,7 +234,39 @@ const CartPage = () => {
             detailedAddress,
         };
 
-        await createOrderMutation.mutateAsync({ shippingInfo, paymentMethod });
+        // Sao chép giỏ hàng để backend xử lý đúng các giá Flash Sale
+        const cartWithFlashSale = {
+            ...cart,
+            flashSaleProducts: flashSaleProducts
+        };
+
+        await createOrderMutation.mutateAsync({
+            shippingInfo,
+            paymentMethod,
+            cartWithFlashSale
+        });
+    };
+
+    const calculateTotalSavings = () => {
+        let totalSavings = 0;
+        if (Object.keys(flashSaleProducts).length > 0 && cart?.products?.length > 0) {
+            cart.products.forEach(item => {
+                const productId = item?.product?._id;
+                if (productId && flashSaleProducts[productId]) {
+                    // Giá thông thường từ API
+                    const originalPrice = item.product.price;
+
+                    // Giá Flash Sale từ localStorage
+                    const flashSalePrice = flashSaleProducts[productId].discountPrice;
+
+                    if (originalPrice > flashSalePrice) {
+                        const savings = (originalPrice - flashSalePrice) * item.quantity;
+                        totalSavings += savings;
+                    }
+                }
+            });
+        }
+        return totalSavings;
     };
 
     return (
@@ -169,63 +285,135 @@ const CartPage = () => {
                     {/* Danh sách sản phẩm */}
                     <List
                         dataSource={cart?.products}
-                        renderItem={(item) => (
-                            <List.Item className="border-b pb-4 mb-4 flex">
-                                <Row gutter={16} className="w-full items-center">
-                                    <Col
-                                        span={6}
-                                        className="flex flex-col items-center space-y-2"
-                                    >
-                                        {/* Ảnh sản phẩm */}
-                                        <img
-                                            src={item?.product?.imageUrl[0]}
-                                            alt={item?.product?.name}
-                                            className="h-20 w-auto rounded-lg object-contain"
-                                        />
+                        renderItem={(item) => {
+                            const productId = item?.product?._id;
+                            const isFlashSale = !!flashSaleProducts[productId];
 
-                                        {/* Nút xóa */}
-                                        <Button
-                                            type="text"
-                                            danger
-                                            icon={<CloseOutlined />} // Dùng icon "X" của Ant Design
-                                            onClick={() => handleRemoveItem(item?.product?._id)}
-                                            className="hover:bg-red-50 hover:text-red-500 border hover:border-red-400 px-2 py-1 rounded-lg transition-all"
-                                        >
-                                            Xóa
-                                        </Button>
-                                    </Col>
-                                    <Col span={10}>
-                                        <Text strong>{item?.product?.name}</Text>
-                                        <br />
-                                        <Text type="secondary">Màu: {item?.product?.color}</Text>
-                                    </Col>
-                                    <Col span={4}>
-                                        <InputNumber
-                                            min={1}
-                                            max={item?.product?.countInStock}
-                                            value={item.quantity}
-                                            onChange={(value) =>
-                                                handleQuantityChange(item?.product?._id, value)
-                                            }
-                                        />
-                                    </Col>
-                                    <Col span={4}>
-                                        <Text strong>
-                                            {(item?.product?.price * item.quantity).toLocaleString(
-                                                "vi-VN"
-                                            )} ₫
-                                        </Text>
-                                    </Col>
-                                </Row>
-                            </List.Item>
-                        )}
+                            // Lấy thông tin Flash Sale nếu có
+                            const flashSaleInfo = isFlashSale ? flashSaleProducts[productId] : null;
+
+                            // Lấy giá gốc từ sản phẩm
+                            const originalPrice = item?.product?.price || 0;
+
+                            // Lấy giá Flash Sale nếu có
+                            const flashSalePrice = isFlashSale ? flashSaleInfo.discountPrice : originalPrice;
+
+                            // Tính phần trăm giảm giá nếu có Flash Sale
+                            const discount = isFlashSale ? Math.round((1 - flashSalePrice / originalPrice) * 100) : 0;
+
+                            return (
+                                <List.Item className="border-b pb-4 mb-4 flex">
+                                    <Row
+                                        gutter={[16, 16]}
+                                        align="middle"
+                                        className="w-full"
+                                    >
+                                        <Col span={4}>
+                                            {/* Ảnh sản phẩm */}
+                                            <div className="relative">
+                                                <img
+                                                    src={item?.product?.imageUrl[0]}
+                                                    alt={item?.product?.name}
+                                                    className="h-20 w-auto rounded-lg object-contain"
+                                                />
+                                                {isFlashSale && (
+                                                    <Tag color="volcano" className="absolute top-0 right-0">
+                                                        <ThunderboltOutlined /> -{discount}%
+                                                    </Tag>
+                                                )}
+                                            </div>
+                                        </Col>
+                                        <Col span={2}>
+                                            {/* Nút xóa */}
+                                            <Button
+                                                type="text"
+                                                danger
+                                                icon={<CloseOutlined />}
+                                                onClick={() => handleRemoveItem(item?.product?._id)}
+                                                className="hover:bg-red-50 hover:text-red-500 border hover:border-red-400 px-2 py-1 rounded-lg transition-all"
+                                            >
+                                                Xóa
+                                            </Button>
+                                        </Col>
+                                        <Col span={6}>
+                                            <Text strong>{item?.product?.name}</Text>
+                                            <br />
+                                            <Text type="secondary">Màu: {item?.product?.color || "Không có thông tin"}</Text>
+                                            {isFlashSale && (
+                                                <div>
+                                                    <Tag color="orange" className="mt-1">
+                                                        <ThunderboltOutlined /> Flash Sale
+                                                    </Tag>
+                                                </div>
+                                            )}
+                                        </Col>
+                                        <Col span={4}>
+                                            <InputNumber
+                                                min={1}
+                                                max={item?.product?.countInStock}
+                                                value={item.quantity}
+                                                onChange={(value) =>
+                                                    handleQuantityChange(item?.product?._id, value)
+                                                }
+                                            />
+                                        </Col>
+                                        <Col span={4}>
+                                            {isFlashSale ? (
+                                                <div className="flex flex-col items-end text-right">
+                                                    <div className="mb-1">
+                                                        <Text delete type="secondary" className="text-xs">
+                                                            {originalPrice.toLocaleString("vi-VN")}₫
+                                                        </Text>
+                                                    </div>
+                                                    <div className="mb-1">
+                                                        <Text className="text-xs text-green-500">
+                                                            {((originalPrice - flashSalePrice) * item.quantity).toLocaleString("vi-VN")}₫
+                                                        </Text>
+                                                    </div>
+                                                    <div>
+                                                        <Text strong className="text-red-500">
+                                                            {(flashSalePrice * item.quantity).toLocaleString("vi-VN")}₫
+                                                        </Text>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <Text strong className="block text-right text-red-500">
+                                                    {(originalPrice * item.quantity).toLocaleString("vi-VN")}₫
+                                                </Text>
+                                            )}
+                                        </Col>
+                                    </Row>
+                                </List.Item>
+                            );
+                        }}
                     />
 
                     {/* Tạm tính */}
                     <div className="border-t pt-4 mt-4">
-                        <Title level={4} style={{ textAlign: "right", color: "#323232" }}>
-                            Tạm tính: {cart?.totalPrice?.toLocaleString("vi-VN")}₫
-                        </Title>
+                        <Row align="middle" justify="end">
+                            <Col>
+                                <div className="flex flex-col items-end">
+                                    <div className="flex items-center mb-1">
+                                        <Text className="text-sm mr-2">Giá gốc:</Text>
+                                        <Text className="text-sm">{cart?.totalPrice ? (calculateTotalSavings() + cart.totalPrice).toLocaleString("vi-VN") : 0}₫</Text>
+                                    </div>
+                                    {Object.keys(flashSaleProducts).length > 0 && (
+                                        <div className="flex items-center mb-1">
+                                            <Text className="text-green-500 text-sm mr-2">Giảm:</Text>
+                                            <Text className="text-green-500 text-sm">
+                                                {calculateTotalSavings().toLocaleString("vi-VN")}₫
+                                            </Text>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center">
+                                        <Text className="mr-2 text-red-500" style={{ fontSize: '16px' }}>Tạm tính:</Text>
+                                        <Title level={4} style={{ color: "#ED1C24", margin: 0 }}>
+                                            {cart?.totalPrice?.toLocaleString("vi-VN")}₫
+                                        </Title>
+                                    </div>
+                                </div>
+                            </Col>
+                        </Row>
                     </div>
 
                     {/* Kiểm tra giỏ hàng trống */}
@@ -311,13 +499,6 @@ const CartPage = () => {
                                     </Button>
                                 </Form.Item>
                             </Form>
-
-                            {/* Tổng tiền nằm ở dưới cùng trang */}
-                            <div className="p-4">
-                                <Title level={4} style={{ textAlign: "right", color: "#ED1C24" }}>
-                                    Tổng tiền: {cart?.totalPrice?.toLocaleString("vi-VN")}₫
-                                </Title>
-                            </div>
                         </>
                     )}
                 </div>

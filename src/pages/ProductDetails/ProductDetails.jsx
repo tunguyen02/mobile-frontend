@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import productService from '../../services/productService';
 import productDetailService from '../../services/productDetailService';
 import { FaChevronLeft, FaChevronRight, FaShoppingCart, FaTruck, FaCheck, FaBox, FaInfoCircle, FaBolt, FaMicrochip, FaCamera, FaBatteryFull, FaMobileAlt } from 'react-icons/fa';
-import { Tabs, Collapse, message, Spin, Badge, Divider, Breadcrumb, Card, Carousel, List, Button, Rate, Input, Modal, notification } from 'antd';
+import { Tabs, Collapse, message, Spin, Badge, Divider, Breadcrumb, Card, Carousel, List, Button, Rate, Input, Modal, notification, Statistic } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { handleGetAccessToken } from '../../services/axiosJWT';
 import cartService from '../../services/cartService';
@@ -16,6 +16,7 @@ import ReviewForm from "../../components/ReviewForm/ReviewForm";
 const { TabPane } = Tabs;
 const { Panel } = Collapse;
 const { TextArea } = Input;
+const { Countdown } = Statistic;
 
 const ProductDetail = () => {
     const { productId } = useParams();
@@ -28,10 +29,20 @@ const ProductDetail = () => {
     const [reviewModal, setReviewModal] = useState(false);
     const [userReviewData, setUserReviewData] = useState(null);
     const queryClient = useQueryClient();
+    const [flashSaleInfo, setFlashSaleInfo] = useState(null);
 
     const mutationAddToCart = useMutation({
         mutationFn: () => {
             const accessToken = handleGetAccessToken();
+            // Nếu đang trong Flash Sale, gửi thông tin Flash Sale khi thêm vào giỏ hàng
+            if (flashSaleInfo && isFlashSaleActive()) {
+                return cartService.addFlashSaleProductToCart(
+                    accessToken,
+                    productId,
+                    flashSaleInfo.flashSaleId,
+                    flashSaleInfo.discountPrice
+                );
+            }
             return cartService.addProductToCart(accessToken, productId);
         },
         onSuccess: (data) => {
@@ -44,6 +55,30 @@ const ProductDetail = () => {
     });
 
     const { data, isPending } = mutationAddToCart;
+
+    // Kiểm tra Flash Sale có đang active hay không
+    const isFlashSaleActive = () => {
+        if (!flashSaleInfo) return false;
+
+        const now = new Date().getTime();
+        const endTime = new Date(flashSaleInfo.endTime).getTime();
+
+        // Kiểm tra nếu chưa hết hạn và còn số lượng
+        return now < endTime && (flashSaleInfo.quantity - flashSaleInfo.soldCount) > 0;
+    };
+
+    // Lấy thông tin Flash Sale từ localStorage khi component mount
+    useEffect(() => {
+        try {
+            const storedFlashSaleInfo = localStorage.getItem(`flashSale_${productId}`);
+            if (storedFlashSaleInfo) {
+                const parsedInfo = JSON.parse(storedFlashSaleInfo);
+                setFlashSaleInfo(parsedInfo);
+            }
+        } catch (error) {
+            console.error('Lỗi khi lấy thông tin Flash Sale:', error);
+        }
+    }, [productId]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -123,7 +158,16 @@ const ProductDetail = () => {
         mutationAddToCart.mutate();
     }
 
-    const savingAmount = product?.originalPrice - product?.price;
+    // Tính giá và % giảm giá dựa trên thông tin Flash Sale hoặc giá thường
+    const getPrice = () => {
+        if (flashSaleInfo && isFlashSaleActive()) {
+            return flashSaleInfo.discountPrice;
+        }
+        return product?.price || 0;
+    };
+
+    const currentPrice = getPrice();
+    const savingAmount = product?.originalPrice - currentPrice;
     const savingPercentage = Math.round((savingAmount / product?.originalPrice) * 100);
 
     const handleOpenReviewModal = () => {
@@ -294,9 +338,15 @@ const ProductDetail = () => {
                                         <div className="rounded-xl shadow-lg overflow-hidden border border-gray-700">
                                             <div className="p-4">
                                                 <div className="flex items-center justify-between">
-                                                    <h2 className="text-base font-bold flex items-center text-orange-400">
-                                                        <FaBolt className="mr-2" size={16} /> Giá Ưu Đãi
-                                                    </h2>
+                                                    {flashSaleInfo && isFlashSaleActive() ? (
+                                                        <h2 className="text-base font-bold flex items-center text-yellow-400">
+                                                            <FaBolt className="mr-2" size={16} /> FLASH SALE
+                                                        </h2>
+                                                    ) : (
+                                                        <h2 className="text-base font-bold flex items-center text-orange-400">
+                                                            <FaBolt className="mr-2" size={16} /> Giá Ưu Đãi
+                                                        </h2>
+                                                    )}
                                                     {savingPercentage > 0 && (
                                                         <span className="bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
                                                             -{savingPercentage}%
@@ -304,11 +354,26 @@ const ProductDetail = () => {
                                                     )}
                                                 </div>
 
+                                                {/* Hiển thị đếm ngược nếu đang là flash sale */}
+                                                {flashSaleInfo && isFlashSaleActive() && (
+                                                    <div className="mt-2 bg-gray-700 p-2 rounded-lg">
+                                                        <div className="text-xs text-gray-300 mb-1">Kết thúc sau:</div>
+                                                        <Countdown
+                                                            value={new Date(flashSaleInfo.endTime).getTime()}
+                                                            format="HH:mm:ss"
+                                                            className="text-white font-medium"
+                                                        />
+                                                        <div className="text-xs text-gray-300 mt-1">
+                                                            Còn lại: {flashSaleInfo.quantity - flashSaleInfo.soldCount}/{flashSaleInfo.quantity}
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <div className="mt-2 flex items-end">
                                                     <div className="text-3xl font-bold text-orange-500">
-                                                        {formatCurrency(product?.price)}<sup>₫</sup>
+                                                        {formatCurrency(currentPrice)}<sup>₫</sup>
                                                     </div>
-                                                    {product?.originalPrice > product?.price && (
+                                                    {product?.originalPrice > currentPrice && (
                                                         <div className="ml-2 text-sm text-gray-400 line-through self-end">{formatCurrency(product?.originalPrice)}<sup>₫</sup></div>
                                                     )}
                                                 </div>

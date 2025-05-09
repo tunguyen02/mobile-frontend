@@ -96,8 +96,20 @@ const FlashSaleSection = () => {
         }
     };
 
-    const handleViewProduct = (productId) => {
+    const handleViewProduct = (productId, flashSaleInfo) => {
         try {
+            // Lưu thông tin flash sale vào localStorage để sử dụng ở trang chi tiết
+            if (flashSaleInfo) {
+                const flashSaleData = {
+                    flashSaleId: flashSaleInfo.flashSaleId,
+                    discountPrice: flashSaleInfo.discountPrice,
+                    quantity: flashSaleInfo.quantity,
+                    soldCount: flashSaleInfo.soldCount,
+                    endTime: flashSaleInfo.endTime
+                };
+                localStorage.setItem(`flashSale_${productId}`, JSON.stringify(flashSaleData));
+            }
+
             navigate(`/product/product-details/${productId}`);
         } catch (error) {
             console.error('Error navigating to product details:', error);
@@ -221,11 +233,20 @@ const FlashSaleSection = () => {
                         const product = item.product;
                         const discountPercent = calculateDiscount(product.price, item.discountPrice);
 
+                        // Tạo đối tượng thông tin flash sale để truyền cho trang chi tiết
+                        const flashSaleInfo = {
+                            flashSaleId: currentFlashSale._id,
+                            discountPrice: item.discountPrice,
+                            quantity: item.quantity,
+                            soldCount: item.soldCount,
+                            endTime: currentFlashSale.endTime
+                        };
+
                         return (
                             <div key={product._id} className="px-2 pb-3">
                                 <div
                                     className="flash-sale-product bg-zinc-900 rounded-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                                    onClick={() => handleViewProduct(product._id)}
+                                    onClick={() => handleViewProduct(product._id, flashSaleInfo)}
                                 >
                                     <div className="relative bg-white p-4 flex justify-center items-center h-44">
                                         <img

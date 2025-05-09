@@ -3,11 +3,15 @@ import axiosJWT from "./axiosJWT";
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const orderService = {
-    createOrder: async (accessToken, shippingInfo, paymentMethod) => {
+    createOrder: async (accessToken, shippingInfo, paymentMethod, cartWithFlashSale) => {
         try {
             const response = await axiosJWT.post(
                 `${apiUrl}/order/create`,
-                { shippingInfo, paymentMethod },
+                {
+                    shippingInfo,
+                    paymentMethod,
+                    cartWithFlashSale
+                },
                 {
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
