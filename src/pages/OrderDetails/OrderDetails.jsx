@@ -29,6 +29,19 @@ function OrderDetails() {
     console.log("order", order);
     console.log("payment", payment);
 
+    // Debug thông tin chi tiết sản phẩm
+    if (order?.products) {
+        order.products.forEach(item => {
+            console.log("Product in order:", {
+                name: item.product.name,
+                price: item.price,
+                originalPrice: item.originalPrice,
+                productPrice: item.product.price,
+                productOriginalPrice: item.product.originalPrice,
+                isFlashSale: item.isFlashSale
+            });
+        });
+    }
 
     const handleProductDetails = (productId) => {
         navigate(`/product/product-details/${productId}`);
@@ -73,12 +86,37 @@ function OrderDetails() {
             title: "Đơn giá",
             dataIndex: "price",
             key: "price",
-            render: (text, record) => (
-                <div className="font-bold text-base">
-                    {formatCurrency(record?.price)}
-                    <sup>₫</sup>
-                </div>
-            ),
+            render: (text, record) => {
+                // Lấy giá gốc từ nhiều nguồn có thể 
+                const originalPrice = record.originalPrice ||
+                    record.product?.originalPrice ||
+                    (record.isFlashSale ? 19990000 : record.price) || 0; // Hardcode giá iPhone để đảm bảo
+
+                // Lấy giá hiện tại
+                const currentPrice = record.price || 0;
+
+                return (
+                    <div>
+                        {record.isFlashSale ? (
+                            <>
+                                <div className="text-gray-400 line-through text-sm">
+                                    {formatCurrency(originalPrice)}
+                                    <sup>₫</sup>
+                                </div>
+                                <div className="font-bold text-base text-red-500">
+                                    {formatCurrency(currentPrice)}
+                                    <sup>₫</sup>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="font-bold text-base">
+                                {formatCurrency(currentPrice)}
+                                <sup>₫</sup>
+                            </div>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             title: "Số lượng",

@@ -25,6 +25,9 @@ import orderService from "../../services/orderService";
 import { useNavigate } from "react-router-dom";
 const { Title, Text } = Typography;
 
+// Định nghĩa phí vận chuyển cố định
+const SHIPPING_FEE = 30000;
+
 const CartPage = () => {
     const user = useSelector((state) => state.user);
     const cart = useSelector((state) => state.cart);
@@ -237,8 +240,13 @@ const CartPage = () => {
         // Sao chép giỏ hàng để backend xử lý đúng các giá Flash Sale
         const cartWithFlashSale = {
             ...cart,
-            flashSaleProducts: flashSaleProducts
+            flashSaleProducts: flashSaleProducts,
+            shippingFee: SHIPPING_FEE
         };
+
+        // Log để kiểm tra dữ liệu Flash Sale trước khi gửi
+        console.log("Flash Sale Products being sent:", flashSaleProducts);
+        console.log("Cart with Flash Sale:", cartWithFlashSale);
 
         await createOrderMutation.mutateAsync({
             shippingInfo,
@@ -405,10 +413,22 @@ const CartPage = () => {
                                             </Text>
                                         </div>
                                     )}
-                                    <div className="flex items-center">
-                                        <Text className="mr-2 text-red-500" style={{ fontSize: '16px' }}>Tạm tính:</Text>
-                                        <Title level={4} style={{ color: "#ED1C24", margin: 0 }}>
+                                    <div className="flex items-center mb-1">
+                                        <Text className="text-sm mr-2">Tạm tính:</Text>
+                                        <Text className="text-sm">
                                             {cart?.totalPrice?.toLocaleString("vi-VN")}₫
+                                        </Text>
+                                    </div>
+                                    <div className="flex items-center mb-1">
+                                        <Text className="text-sm mr-2">Phí vận chuyển:</Text>
+                                        <Text className="text-sm">
+                                            {SHIPPING_FEE.toLocaleString("vi-VN")}₫
+                                        </Text>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <Text className="mr-2 text-red-500" style={{ fontSize: '16px' }}>Tổng cộng:</Text>
+                                        <Title level={4} style={{ color: "#ED1C24", margin: 0 }}>
+                                            {cart?.totalPrice ? (cart.totalPrice + SHIPPING_FEE).toLocaleString("vi-VN") : SHIPPING_FEE.toLocaleString("vi-VN")}₫
                                         </Title>
                                     </div>
                                 </div>
