@@ -23,6 +23,7 @@ import { handleGetAccessToken } from "../../services/axiosJWT";
 import { resetCart, setCart } from "../../redux/cartSlice";
 import orderService from "../../services/orderService";
 import { useNavigate } from "react-router-dom";
+import { isFlashSaleValid, updateFlashSaleSoldCount } from "../../utils/utils";
 const { Title, Text } = Typography;
 
 // Định nghĩa phí vận chuyển cố định
@@ -49,14 +50,11 @@ const CartPage = () => {
                         if (flashSaleData) {
                             const parsedData = JSON.parse(flashSaleData);
 
-                            // Kiểm tra nếu Flash Sale còn hiệu lực
-                            const now = new Date().getTime();
-                            const endTime = parsedData.endTime ? new Date(parsedData.endTime).getTime() : 0;
-
-                            if (endTime > now) {
+                            // Sử dụng hàm tiện ích để kiểm tra tính hợp lệ của Flash Sale
+                            if (isFlashSaleValid(parsedData)) {
                                 flashSaleItems[productId] = parsedData;
                             } else {
-                                // Xóa Flash Sale hết hạn
+                                // Xóa Flash Sale hết hạn hoặc hết số lượng
                                 localStorage.removeItem(`flashSale_${productId}`);
                             }
                         }
@@ -185,6 +183,38 @@ const CartPage = () => {
     };
 
     const handleQuantityChange = (id, value) => {
+        // Lấy số lượng hiện tại của sản phẩm trong giỏ hàng
+        const currentItem = cart?.products?.find(item => item.product?._id === id);
+        if (!currentItem) return;
+
+        // Tính số lượng thay đổi
+        const currentQuantity = currentItem.quantity;
+        const quantityChange = value - currentQuantity;
+
+        // Nếu có tăng số lượng và là sản phẩm Flash Sale, cập nhật soldCount
+        if (quantityChange > 0 && flashSaleProducts[id]) {
+            // Kiểm tra nếu còn đủ số lượng cho Flash Sale
+            const flashSaleData = JSON.parse(localStorage.getItem(`flashSale_${id}`));
+            if (flashSaleData) {
+                const soldCount = flashSaleData.soldCount || 0;
+                const availableQuantity = flashSaleData.quantity || 0;
+
+                // Nếu số lượng mới vượt quá số lượng còn lại của Flash Sale
+                if (soldCount + quantityChange > availableQuantity) {
+                    message.warning(`Chỉ còn ${availableQuantity - soldCount} sản phẩm với giá Flash Sale`, 3);
+
+                    // Cập nhật số lượng tối đa có thể mua với giá Flash Sale
+                    const maxQuantity = availableQuantity - soldCount + currentQuantity;
+                    updateProductMutation.mutate({ productId: id.toString(), quantity: maxQuantity });
+                    return;
+                }
+
+                // Cập nhật soldCount trong localStorage
+                updateFlashSaleSoldCount(id, quantityChange);
+            }
+        }
+
+        // Thực hiện cập nhật giỏ hàng
         updateProductMutation.mutate({ productId: id.toString(), quantity: value });
     };
 
@@ -200,6 +230,34 @@ const CartPage = () => {
         },
         onSuccess: (data) => {
             message.success(data?.message, 3);
+
+            // Cập nhật số lượng Flash Sale đã bán trong localStorage
+            try {
+                if (cart?.products && Object.keys(flashSaleProducts).length > 0) {
+                    cart.products.forEach(item => {
+                        const productId = item?.product?._id;
+                        if (productId && flashSaleProducts[productId]) {
+                            const flashSaleData = JSON.parse(localStorage.getItem(`flashSale_${productId}`));
+                            if (flashSaleData) {
+                                // Cập nhật soldCount
+                                const newSoldCount = (flashSaleData.soldCount || 0) + item.quantity;
+                                flashSaleData.soldCount = newSoldCount;
+
+                                // Lưu lại vào localStorage
+                                localStorage.setItem(`flashSale_${productId}`, JSON.stringify(flashSaleData));
+
+                                // Nếu đã bán hết, xóa khỏi localStorage
+                                if (newSoldCount >= flashSaleData.quantity) {
+                                    localStorage.removeItem(`flashSale_${productId}`);
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Lỗi khi cập nhật số lượng Flash Sale:", error);
+            }
+
             dispatch(resetCart());
             if (data.paymentUrl) {
                 window.location.href = data.paymentUrl;

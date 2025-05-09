@@ -1,4 +1,5 @@
 import axiosJWT from "./axiosJWT";
+import { isFlashSaleValid, updateFlashSaleSoldCount } from "../utils/utils";
 
 const apiUrl = import.meta.env.VITE_API_URL;
 const cartApiUrl = `${apiUrl}/cart`;
@@ -37,7 +38,25 @@ const cartService = {
         return response.data;
     },
     addFlashSaleProductToCart: async (accessToken, productId, flashSaleId, discountPrice) => {
-        // Đầu tiên, thêm sản phẩm vào giỏ hàng
+        // Kiểm tra trước nếu Flash Sale còn hiệu lực
+        const flashSaleData = localStorage.getItem(`flashSale_${productId}`);
+        let isValidFlashSale = false;
+
+        if (flashSaleData) {
+            const parsedData = JSON.parse(flashSaleData);
+            isValidFlashSale = isFlashSaleValid(parsedData);
+
+            // Nếu Flash Sale không còn hiệu lực, xóa khỏi localStorage và thêm sản phẩm với giá thường
+            if (!isValidFlashSale) {
+                localStorage.removeItem(`flashSale_${productId}`);
+                return cartService.addProductToCart(accessToken, productId);
+            }
+        } else {
+            // Không có thông tin Flash Sale, thêm với giá thường
+            return cartService.addProductToCart(accessToken, productId);
+        }
+
+        // Đầu tiên, thêm sản phẩm vào giỏ hàng với thông tin Flash Sale
         const response = await axiosJWT.patch(`${cartApiUrl}/add-product`, {
             productId,
             isFlashSale: true,
@@ -49,17 +68,8 @@ const cartService = {
             }
         });
 
-        // Lưu thông tin Flash Sale vào localStorage (sử dụng cùng key với FlashSaleSection)
-        const flashSaleData = localStorage.getItem(`flashSale_${productId}`);
-        if (!flashSaleData) {
-            // Chỉ lưu nếu chưa có (để không ghi đè thông tin đầy đủ hơn từ FlashSaleSection)
-            const flashSaleCartItem = {
-                flashSaleId,
-                discountPrice,
-                endTime: new Date().getTime() + (24 * 60 * 60 * 1000) // Mặc định 24h nếu không có thông tin
-            };
-            localStorage.setItem(`flashSale_${productId}`, JSON.stringify(flashSaleCartItem));
-        }
+        // Cập nhật số lượng đã bán trong Flash Sale
+        updateFlashSaleSoldCount(productId, 1);
 
         return response.data;
     }

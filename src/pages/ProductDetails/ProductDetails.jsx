@@ -12,6 +12,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setCart } from '../../redux/cartSlice';
 import ProductReviews from "../../components/ProductReviews/ProductReviews";
 import ReviewForm from "../../components/ReviewForm/ReviewForm";
+import { isFlashSaleValid } from "../../utils/utils";
 
 const { TabPane } = Tabs;
 const { Panel } = Collapse;
@@ -34,8 +35,8 @@ const ProductDetail = () => {
     const mutationAddToCart = useMutation({
         mutationFn: () => {
             const accessToken = handleGetAccessToken();
-            // Nếu đang trong Flash Sale, gửi thông tin Flash Sale khi thêm vào giỏ hàng
-            if (flashSaleInfo && isFlashSaleActive()) {
+            // Nếu đang trong Flash Sale và còn hiệu lực, gửi thông tin Flash Sale khi thêm vào giỏ hàng
+            if (flashSaleInfo && isFlashSaleValid(flashSaleInfo)) {
                 return cartService.addFlashSaleProductToCart(
                     accessToken,
                     productId,
@@ -58,13 +59,7 @@ const ProductDetail = () => {
 
     // Kiểm tra Flash Sale có đang active hay không
     const isFlashSaleActive = () => {
-        if (!flashSaleInfo) return false;
-
-        const now = new Date().getTime();
-        const endTime = new Date(flashSaleInfo.endTime).getTime();
-
-        // Kiểm tra nếu chưa hết hạn và còn số lượng
-        return now < endTime && (flashSaleInfo.quantity - flashSaleInfo.soldCount) > 0;
+        return isFlashSaleValid(flashSaleInfo);
     };
 
     // Lấy thông tin Flash Sale từ localStorage khi component mount
@@ -73,7 +68,14 @@ const ProductDetail = () => {
             const storedFlashSaleInfo = localStorage.getItem(`flashSale_${productId}`);
             if (storedFlashSaleInfo) {
                 const parsedInfo = JSON.parse(storedFlashSaleInfo);
-                setFlashSaleInfo(parsedInfo);
+                // Kiểm tra tính hợp lệ của Flash Sale
+                if (isFlashSaleValid(parsedInfo)) {
+                    setFlashSaleInfo(parsedInfo);
+                } else {
+                    // Xóa Flash Sale hết hạn hoặc hết số lượng
+                    localStorage.removeItem(`flashSale_${productId}`);
+                    setFlashSaleInfo(null);
+                }
             }
         } catch (error) {
             console.error('Lỗi khi lấy thông tin Flash Sale:', error);
