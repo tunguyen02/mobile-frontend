@@ -12,9 +12,10 @@ import {
     Radio,
     message,
     Spin,
+    Tag,
 } from "antd";
 import addressVietNam from "../../constants/addressConstants";
-import { CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { useDispatch, useSelector } from "react-redux";
 import { useMutation } from "@tanstack/react-query";
 import cartService from "../../services/cartService";
@@ -22,13 +23,97 @@ import { handleGetAccessToken } from "../../services/axiosJWT";
 import { resetCart, setCart } from "../../redux/cartSlice";
 import orderService from "../../services/orderService";
 import { useNavigate } from "react-router-dom";
+import { isFlashSaleValid, updateFlashSaleSoldCount } from "../../utils/utils";
 const { Title, Text } = Typography;
+
+// Định nghĩa phí vận chuyển cố định
+const SHIPPING_FEE = 30000;
 
 const CartPage = () => {
     const user = useSelector((state) => state.user);
     const cart = useSelector((state) => state.cart);
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const [flashSaleProducts, setFlashSaleProducts] = useState({});
+
+    // Kiểm tra các sản phẩm Flash Sale từ localStorage
+    useEffect(() => {
+        const flashSaleItems = {};
+
+        if (cart?.products) {
+            cart.products.forEach(item => {
+                const productId = item?.product?._id;
+                if (productId) {
+                    try {
+                        // Lấy thông tin Flash Sale từ localStorage
+                        const flashSaleData = localStorage.getItem(`flashSale_${productId}`);
+                        if (flashSaleData) {
+                            const parsedData = JSON.parse(flashSaleData);
+
+                            // Sử dụng hàm tiện ích để kiểm tra tính hợp lệ của Flash Sale
+                            if (isFlashSaleValid(parsedData)) {
+                                flashSaleItems[productId] = parsedData;
+                            } else {
+                                // Xóa Flash Sale hết hạn hoặc hết số lượng
+                                localStorage.removeItem(`flashSale_${productId}`);
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Lỗi khi đọc thông tin Flash Sale:", error);
+                    }
+                }
+            });
+        }
+
+        setFlashSaleProducts(flashSaleItems);
+    }, [cart]);
+
+    // Cập nhật giỏ hàng với thông tin giá Flash Sale
+    useEffect(() => {
+        if (Object.keys(flashSaleProducts).length > 0 && cart?.products?.length > 0) {
+            let needsUpdate = false;
+            const updatedProducts = cart.products.map(item => {
+                const productId = item?.product?._id;
+                if (productId && flashSaleProducts[productId]) {
+                    needsUpdate = true;
+                    // Không thay đổi giá gốc, chỉ đánh dấu sản phẩm là Flash Sale
+                    const product = {
+                        ...item.product,
+                        isFlashSale: true,
+                        flashSaleId: flashSaleProducts[productId].flashSaleId
+                    };
+
+                    return {
+                        ...item,
+                        product
+                    };
+                }
+                return item;
+            });
+
+            if (needsUpdate) {
+                // Tính lại tổng giá với giá Flash Sale
+                const totalPrice = updatedProducts.reduce((total, item) => {
+                    const productId = item?.product?._id;
+                    if (productId && flashSaleProducts[productId]) {
+                        // Sử dụng giá Flash Sale cho tính tổng
+                        return total + (flashSaleProducts[productId].discountPrice * item.quantity);
+                    }
+                    // Sử dụng giá thường
+                    return total + (item.product.price * item.quantity);
+                }, 0);
+
+                // Cập nhật giỏ hàng trong Redux
+                const updatedCart = {
+                    ...cart,
+                    products: updatedProducts,
+                    totalPrice
+                };
+
+                dispatch(setCart(updatedCart));
+            }
+        }
+    }, [flashSaleProducts, dispatch]);
 
     const formRef = useRef(null); // Ref để truy cập Form
     useEffect(() => {
@@ -98,6 +183,54 @@ const CartPage = () => {
     };
 
     const handleQuantityChange = (id, value) => {
+        // Lấy số lượng hiện tại của sản phẩm trong giỏ hàng
+        const currentItem = cart?.products?.find(item => item.product?._id === id);
+        if (!currentItem) return;
+
+        // Tính số lượng thay đổi
+        const currentQuantity = currentItem.quantity;
+        const quantityChange = value - currentQuantity;
+
+        // Nếu có tăng số lượng và là sản phẩm Flash Sale, cập nhật soldCount
+        if (quantityChange > 0 && flashSaleProducts[id]) {
+            // Kiểm tra nếu còn đủ số lượng cho Flash Sale
+            const flashSaleData = JSON.parse(localStorage.getItem(`flashSale_${id}`));
+            if (flashSaleData) {
+                const soldCount = flashSaleData.soldCount || 0;
+                const availableQuantity = flashSaleData.quantity || 0;
+                const remainingQuantity = availableQuantity - soldCount;
+
+                // Nếu số lượng mới vượt quá số lượng còn lại của Flash Sale
+                if (soldCount + quantityChange > availableQuantity) {
+                    if (remainingQuantity <= 0) {
+                        message.warning(`Sản phẩm đã hết số lượng Flash Sale. Nếu bạn tiếp tục mua, sẽ được tính theo giá thông thường.`, 5);
+                        // Xóa Flash Sale khỏi localStorage
+                        localStorage.removeItem(`flashSale_${id}`);
+                        // Cập nhật lại state flashSaleProducts
+                        setFlashSaleProducts(prev => {
+                            const updated = { ...prev };
+                            delete updated[id];
+                            return updated;
+                        });
+                        // Cập nhật số lượng theo yêu cầu
+                        updateProductMutation.mutate({ productId: id.toString(), quantity: value });
+                        return;
+                    } else {
+                        message.warning(`Chỉ còn ${remainingQuantity} sản phẩm với giá Flash Sale. Số lượng đã được điều chỉnh.`, 5);
+
+                        // Cập nhật số lượng tối đa có thể mua với giá Flash Sale
+                        const maxQuantity = remainingQuantity + currentQuantity;
+                        updateProductMutation.mutate({ productId: id.toString(), quantity: maxQuantity });
+                        return;
+                    }
+                }
+
+                // Cập nhật soldCount trong localStorage
+                updateFlashSaleSoldCount(id, quantityChange);
+            }
+        }
+
+        // Thực hiện cập nhật giỏ hàng
         updateProductMutation.mutate({ productId: id.toString(), quantity: value });
     };
 
@@ -107,12 +240,40 @@ const CartPage = () => {
 
     //Create order
     const createOrderMutation = useMutation({
-        mutationFn: async ({ shippingInfo, paymentMethod }) => {
+        mutationFn: async ({ shippingInfo, paymentMethod, cartWithFlashSale }) => {
             const accessToken = handleGetAccessToken();
-            return orderService.createOrder(accessToken, shippingInfo, paymentMethod);
+            return orderService.createOrder(accessToken, shippingInfo, paymentMethod, cartWithFlashSale);
         },
         onSuccess: (data) => {
             message.success(data?.message, 3);
+
+            // Cập nhật số lượng Flash Sale đã bán trong localStorage
+            try {
+                if (cart?.products && Object.keys(flashSaleProducts).length > 0) {
+                    cart.products.forEach(item => {
+                        const productId = item?.product?._id;
+                        if (productId && flashSaleProducts[productId]) {
+                            const flashSaleData = JSON.parse(localStorage.getItem(`flashSale_${productId}`));
+                            if (flashSaleData) {
+                                // Cập nhật soldCount
+                                const newSoldCount = (flashSaleData.soldCount || 0) + item.quantity;
+                                flashSaleData.soldCount = newSoldCount;
+
+                                // Lưu lại vào localStorage
+                                localStorage.setItem(`flashSale_${productId}`, JSON.stringify(flashSaleData));
+
+                                // Nếu đã bán hết, xóa khỏi localStorage
+                                if (newSoldCount >= flashSaleData.quantity) {
+                                    localStorage.removeItem(`flashSale_${productId}`);
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Lỗi khi cập nhật số lượng Flash Sale:", error);
+            }
+
             dispatch(resetCart());
             if (data.paymentUrl) {
                 window.location.href = data.paymentUrl;
@@ -150,7 +311,44 @@ const CartPage = () => {
             detailedAddress,
         };
 
-        await createOrderMutation.mutateAsync({ shippingInfo, paymentMethod });
+        // Sao chép giỏ hàng để backend xử lý đúng các giá Flash Sale
+        const cartWithFlashSale = {
+            ...cart,
+            flashSaleProducts: flashSaleProducts,
+            shippingFee: SHIPPING_FEE
+        };
+
+        // Log để kiểm tra dữ liệu Flash Sale trước khi gửi
+        console.log("Flash Sale Products being sent:", flashSaleProducts);
+        console.log("Cart with Flash Sale:", cartWithFlashSale);
+
+        await createOrderMutation.mutateAsync({
+            shippingInfo,
+            paymentMethod,
+            cartWithFlashSale
+        });
+    };
+
+    const calculateTotalSavings = () => {
+        let totalSavings = 0;
+        if (Object.keys(flashSaleProducts).length > 0 && cart?.products?.length > 0) {
+            cart.products.forEach(item => {
+                const productId = item?.product?._id;
+                if (productId && flashSaleProducts[productId]) {
+                    // Giá thông thường từ API
+                    const originalPrice = item.product.price;
+
+                    // Giá Flash Sale từ localStorage
+                    const flashSalePrice = flashSaleProducts[productId].discountPrice;
+
+                    if (originalPrice > flashSalePrice) {
+                        const savings = (originalPrice - flashSalePrice) * item.quantity;
+                        totalSavings += savings;
+                    }
+                }
+            });
+        }
+        return totalSavings;
     };
 
     return (
@@ -169,63 +367,151 @@ const CartPage = () => {
                     {/* Danh sách sản phẩm */}
                     <List
                         dataSource={cart?.products}
-                        renderItem={(item) => (
-                            <List.Item className="border-b pb-4 mb-4 flex">
-                                <Row gutter={16} className="w-full items-center">
-                                    <Col
-                                        span={6}
-                                        className="flex flex-col items-center space-y-2"
-                                    >
-                                        {/* Ảnh sản phẩm */}
-                                        <img
-                                            src={item?.product?.imageUrl[0]}
-                                            alt={item?.product?.name}
-                                            className="h-20 w-auto rounded-lg object-contain"
-                                        />
+                        renderItem={(item) => {
+                            const productId = item?.product?._id;
+                            const isFlashSale = !!flashSaleProducts[productId];
 
-                                        {/* Nút xóa */}
-                                        <Button
-                                            type="text"
-                                            danger
-                                            icon={<CloseOutlined />} // Dùng icon "X" của Ant Design
-                                            onClick={() => handleRemoveItem(item?.product?._id)}
-                                            className="hover:bg-red-50 hover:text-red-500 border hover:border-red-400 px-2 py-1 rounded-lg transition-all"
-                                        >
-                                            Xóa
-                                        </Button>
-                                    </Col>
-                                    <Col span={10}>
-                                        <Text strong>{item?.product?.name}</Text>
-                                        <br />
-                                        <Text type="secondary">Màu: {item?.product?.color}</Text>
-                                    </Col>
-                                    <Col span={4}>
-                                        <InputNumber
-                                            min={1}
-                                            max={item?.product?.countInStock}
-                                            value={item.quantity}
-                                            onChange={(value) =>
-                                                handleQuantityChange(item?.product?._id, value)
-                                            }
-                                        />
-                                    </Col>
-                                    <Col span={4}>
-                                        <Text strong>
-                                            {(item?.product?.price * item.quantity).toLocaleString(
-                                                "vi-VN"
-                                            )} ₫
-                                        </Text>
-                                    </Col>
-                                </Row>
-                            </List.Item>
-                        )}
+                            // Lấy thông tin Flash Sale nếu có
+                            const flashSaleInfo = isFlashSale ? flashSaleProducts[productId] : null;
+
+                            // Lấy giá gốc từ sản phẩm
+                            const originalPrice = item?.product?.price || 0;
+
+                            // Lấy giá Flash Sale nếu có
+                            const flashSalePrice = isFlashSale ? flashSaleInfo.discountPrice : originalPrice;
+
+                            // Tính phần trăm giảm giá nếu có Flash Sale
+                            const discount = isFlashSale ? Math.round((1 - flashSalePrice / originalPrice) * 100) : 0;
+
+                            return (
+                                <List.Item className="border-b pb-4 mb-4 flex">
+                                    <Row
+                                        gutter={[16, 16]}
+                                        align="middle"
+                                        className="w-full"
+                                    >
+                                        <Col span={4}>
+                                            {/* Ảnh sản phẩm */}
+                                            <div className="relative">
+                                                <img
+                                                    src={item?.product?.imageUrl[0]}
+                                                    alt={item?.product?.name}
+                                                    className="h-20 w-auto rounded-lg object-contain"
+                                                />
+                                                {isFlashSale && (
+                                                    <Tag color="volcano" className="absolute top-0 right-0">
+                                                        <ThunderboltOutlined /> -{discount}%
+                                                    </Tag>
+                                                )}
+                                            </div>
+                                        </Col>
+                                        <Col span={2}>
+                                            {/* Nút xóa */}
+                                            <Button
+                                                type="text"
+                                                danger
+                                                icon={<CloseOutlined />}
+                                                onClick={() => handleRemoveItem(item?.product?._id)}
+                                                className="hover:bg-red-50 hover:text-red-500 border hover:border-red-400 px-2 py-1 rounded-lg transition-all"
+                                            >
+                                                Xóa
+                                            </Button>
+                                        </Col>
+                                        <Col span={6}>
+                                            <Text strong>{item?.product?.name}</Text>
+                                            <br />
+                                            <Text type="secondary">Màu: {item?.product?.color || "Không có thông tin"}</Text>
+                                            {isFlashSale && (
+                                                <div>
+                                                    <Tag color="orange" className="mt-1">
+                                                        <ThunderboltOutlined /> Flash Sale
+                                                    </Tag>
+                                                </div>
+                                            )}
+                                        </Col>
+                                        <Col span={4}>
+                                            <InputNumber
+                                                min={1}
+                                                max={item?.product?.countInStock}
+                                                value={item.quantity}
+                                                onChange={(value) =>
+                                                    handleQuantityChange(item?.product?._id, value)
+                                                }
+                                            />
+                                        </Col>
+                                        <Col span={4}>
+                                            {isFlashSale ? (
+                                                <div className="flex flex-col items-end text-right">
+                                                    <div className="mb-1">
+                                                        <Text delete type="secondary" className="text-xs">
+                                                            {originalPrice.toLocaleString("vi-VN")}₫
+                                                        </Text>
+                                                    </div>
+                                                    <div className="mb-1">
+                                                        <Text className="text-xs text-green-500">
+                                                            {((originalPrice - flashSalePrice) * item.quantity).toLocaleString("vi-VN")}₫
+                                                        </Text>
+                                                    </div>
+                                                    <div>
+                                                        <Text strong className="text-red-500">
+                                                            {(flashSalePrice * item.quantity).toLocaleString("vi-VN")}₫
+                                                        </Text>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <Text strong className="block text-right text-red-500">
+                                                    {(originalPrice * item.quantity).toLocaleString("vi-VN")}₫
+                                                </Text>
+                                            )}
+                                        </Col>
+                                    </Row>
+                                </List.Item>
+                            );
+                        }}
                     />
 
                     {/* Tạm tính */}
                     <div className="border-t pt-4 mt-4">
-                        <Title level={4} style={{ textAlign: "right", color: "#323232" }}>
-                            Tạm tính: {cart?.totalPrice?.toLocaleString("vi-VN")}₫
-                        </Title>
+                        <Row align="middle" justify="end">
+                            <Col>
+                                <div className="flex flex-col items-end">
+                                    {cart?.products?.length > 0 && (
+                                        <>
+                                            <div className="flex items-center mb-1">
+                                                <Text className="text-sm mr-2">Giá gốc:</Text>
+                                                <Text className="text-sm">{cart?.totalPrice ? (calculateTotalSavings() + cart.totalPrice).toLocaleString("vi-VN") : 0}₫</Text>
+                                            </div>
+                                            {Object.keys(flashSaleProducts).length > 0 && (
+                                                <div className="flex items-center mb-1">
+                                                    <Text className="text-green-500 text-sm mr-2">Giảm:</Text>
+                                                    <Text className="text-green-500 text-sm">
+                                                        {calculateTotalSavings().toLocaleString("vi-VN")}₫
+                                                    </Text>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center mb-1">
+                                                <Text className="text-sm mr-2">Tạm tính:</Text>
+                                                <Text className="text-sm">
+                                                    {cart?.totalPrice?.toLocaleString("vi-VN")}₫
+                                                </Text>
+                                            </div>
+                                            <div className="flex items-center mb-1">
+                                                <Text className="text-sm mr-2">Phí vận chuyển:</Text>
+                                                <Text className="text-sm">
+                                                    {SHIPPING_FEE.toLocaleString("vi-VN")}₫
+                                                </Text>
+                                            </div>
+                                            <div className="flex items-center">
+                                                <Text className="mr-2 text-red-500" style={{ fontSize: '16px' }}>Tổng cộng:</Text>
+                                                <Title level={4} style={{ color: "#ED1C24", margin: 0 }}>
+                                                    {cart?.totalPrice ? (cart.totalPrice + SHIPPING_FEE).toLocaleString("vi-VN") : SHIPPING_FEE.toLocaleString("vi-VN")}₫
+                                                </Title>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </Col>
+                        </Row>
                     </div>
 
                     {/* Kiểm tra giỏ hàng trống */}
@@ -311,13 +597,6 @@ const CartPage = () => {
                                     </Button>
                                 </Form.Item>
                             </Form>
-
-                            {/* Tổng tiền nằm ở dưới cùng trang */}
-                            <div className="p-4">
-                                <Title level={4} style={{ textAlign: "right", color: "#ED1C24" }}>
-                                    Tổng tiền: {cart?.totalPrice?.toLocaleString("vi-VN")}₫
-                                </Title>
-                            </div>
                         </>
                     )}
                 </div>

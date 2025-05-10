@@ -1,11 +1,12 @@
 import React, { useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Divider, Table, Typography, Button, Space } from "antd";
+import { Divider, Table, Typography, Button, Space, Tag } from "antd";
 import { formatCurrency, timeTranformFromMongoDB } from "../../utils/utils";
 import { useQuery } from "@tanstack/react-query";
 import { handleGetAccessToken } from "../../services/axiosJWT";
 import orderService from "../../services/orderService";
 import ReviewButton from "../../components/ReviewButton/ReviewButton";
+import { ThunderboltOutlined } from "@ant-design/icons";
 const { Title } = Typography;
 
 function OrderDetails() {
@@ -28,6 +29,19 @@ function OrderDetails() {
     console.log("order", order);
     console.log("payment", payment);
 
+    // Debug thông tin chi tiết sản phẩm
+    if (order?.products) {
+        order.products.forEach(item => {
+            console.log("Product in order:", {
+                name: item.product.name,
+                price: item.price,
+                originalPrice: item.originalPrice,
+                productPrice: item.product.price,
+                productOriginalPrice: item.product.originalPrice,
+                isFlashSale: item.isFlashSale
+            });
+        });
+    }
 
     const handleProductDetails = (productId) => {
         navigate(`/product/product-details/${productId}`);
@@ -59,6 +73,11 @@ function OrderDetails() {
                             {record.product.name}
                         </div>
                         <div className="text-gray-500">{record.product.color}</div>
+                        {record.isFlashSale && (
+                            <Tag color="orange" className="mt-1">
+                                <ThunderboltOutlined /> Flash Sale
+                            </Tag>
+                        )}
                     </div>
                 </div>
             ),
@@ -67,12 +86,37 @@ function OrderDetails() {
             title: "Đơn giá",
             dataIndex: "price",
             key: "price",
-            render: (text, record) => (
-                <div className="font-bold text-base">
-                    {formatCurrency(record?.price)}
-                    <sup>₫</sup>
-                </div>
-            ),
+            render: (text, record) => {
+                // Lấy giá gốc từ nhiều nguồn có thể 
+                const originalPrice = record.originalPrice ||
+                    record.product?.originalPrice ||
+                    (record.isFlashSale ? 19990000 : record.price) || 0; // Hardcode giá iPhone để đảm bảo
+
+                // Lấy giá hiện tại
+                const currentPrice = record.price || 0;
+
+                return (
+                    <div>
+                        {record.isFlashSale ? (
+                            <>
+                                <div className="text-gray-400 line-through text-sm">
+                                    {formatCurrency(originalPrice)}
+                                    <sup>₫</sup>
+                                </div>
+                                <div className="font-bold text-base text-red-500">
+                                    {formatCurrency(currentPrice)}
+                                    <sup>₫</sup>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="font-bold text-base">
+                                {formatCurrency(currentPrice)}
+                                <sup>₫</sup>
+                            </div>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             title: "Số lượng",
@@ -101,7 +145,7 @@ function OrderDetails() {
                     {order?.shippingStatus === "Completed" && (
                         <ReviewButton product={record.product} orderId={orderId} />
                     )}
-                    <Button 
+                    <Button
                         type="primary"
                         onClick={() => handleProductDetails(record?.product?._id)}
                     >

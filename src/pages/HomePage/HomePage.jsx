@@ -6,6 +6,7 @@ import brandService from "../../services/brandService";
 import Loading from "../../components/Loading/Loading";
 import { useNavigate } from "react-router-dom";
 import { CaretRightOutlined } from "@ant-design/icons";
+import FlashSaleSection from "../../components/FlashSale/FlashSaleSection";
 
 function HomePage() {
     const navigate = useNavigate();
@@ -85,6 +86,10 @@ function HomePage() {
                     );
                 })}
             </Carousel>
+            
+            {/* Flash Sale Section */}
+            <FlashSaleSection />
+            
             <div className="py-8 px-28">
                 <div className="py-8 flex justify-center">
                     <Button
