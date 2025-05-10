@@ -198,15 +198,31 @@ const CartPage = () => {
             if (flashSaleData) {
                 const soldCount = flashSaleData.soldCount || 0;
                 const availableQuantity = flashSaleData.quantity || 0;
+                const remainingQuantity = availableQuantity - soldCount;
 
                 // Nếu số lượng mới vượt quá số lượng còn lại của Flash Sale
                 if (soldCount + quantityChange > availableQuantity) {
-                    message.warning(`Chỉ còn ${availableQuantity - soldCount} sản phẩm với giá Flash Sale`, 3);
+                    if (remainingQuantity <= 0) {
+                        message.warning(`Sản phẩm đã hết số lượng Flash Sale. Nếu bạn tiếp tục mua, sẽ được tính theo giá thông thường.`, 5);
+                        // Xóa Flash Sale khỏi localStorage
+                        localStorage.removeItem(`flashSale_${id}`);
+                        // Cập nhật lại state flashSaleProducts
+                        setFlashSaleProducts(prev => {
+                            const updated = { ...prev };
+                            delete updated[id];
+                            return updated;
+                        });
+                        // Cập nhật số lượng theo yêu cầu
+                        updateProductMutation.mutate({ productId: id.toString(), quantity: value });
+                        return;
+                    } else {
+                        message.warning(`Chỉ còn ${remainingQuantity} sản phẩm với giá Flash Sale. Số lượng đã được điều chỉnh.`, 5);
 
-                    // Cập nhật số lượng tối đa có thể mua với giá Flash Sale
-                    const maxQuantity = availableQuantity - soldCount + currentQuantity;
-                    updateProductMutation.mutate({ productId: id.toString(), quantity: maxQuantity });
-                    return;
+                        // Cập nhật số lượng tối đa có thể mua với giá Flash Sale
+                        const maxQuantity = remainingQuantity + currentQuantity;
+                        updateProductMutation.mutate({ productId: id.toString(), quantity: maxQuantity });
+                        return;
+                    }
                 }
 
                 // Cập nhật soldCount trong localStorage
@@ -459,36 +475,40 @@ const CartPage = () => {
                         <Row align="middle" justify="end">
                             <Col>
                                 <div className="flex flex-col items-end">
-                                    <div className="flex items-center mb-1">
-                                        <Text className="text-sm mr-2">Giá gốc:</Text>
-                                        <Text className="text-sm">{cart?.totalPrice ? (calculateTotalSavings() + cart.totalPrice).toLocaleString("vi-VN") : 0}₫</Text>
-                                    </div>
-                                    {Object.keys(flashSaleProducts).length > 0 && (
-                                        <div className="flex items-center mb-1">
-                                            <Text className="text-green-500 text-sm mr-2">Giảm:</Text>
-                                            <Text className="text-green-500 text-sm">
-                                                {calculateTotalSavings().toLocaleString("vi-VN")}₫
-                                            </Text>
-                                        </div>
+                                    {cart?.products?.length > 0 && (
+                                        <>
+                                            <div className="flex items-center mb-1">
+                                                <Text className="text-sm mr-2">Giá gốc:</Text>
+                                                <Text className="text-sm">{cart?.totalPrice ? (calculateTotalSavings() + cart.totalPrice).toLocaleString("vi-VN") : 0}₫</Text>
+                                            </div>
+                                            {Object.keys(flashSaleProducts).length > 0 && (
+                                                <div className="flex items-center mb-1">
+                                                    <Text className="text-green-500 text-sm mr-2">Giảm:</Text>
+                                                    <Text className="text-green-500 text-sm">
+                                                        {calculateTotalSavings().toLocaleString("vi-VN")}₫
+                                                    </Text>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center mb-1">
+                                                <Text className="text-sm mr-2">Tạm tính:</Text>
+                                                <Text className="text-sm">
+                                                    {cart?.totalPrice?.toLocaleString("vi-VN")}₫
+                                                </Text>
+                                            </div>
+                                            <div className="flex items-center mb-1">
+                                                <Text className="text-sm mr-2">Phí vận chuyển:</Text>
+                                                <Text className="text-sm">
+                                                    {SHIPPING_FEE.toLocaleString("vi-VN")}₫
+                                                </Text>
+                                            </div>
+                                            <div className="flex items-center">
+                                                <Text className="mr-2 text-red-500" style={{ fontSize: '16px' }}>Tổng cộng:</Text>
+                                                <Title level={4} style={{ color: "#ED1C24", margin: 0 }}>
+                                                    {cart?.totalPrice ? (cart.totalPrice + SHIPPING_FEE).toLocaleString("vi-VN") : SHIPPING_FEE.toLocaleString("vi-VN")}₫
+                                                </Title>
+                                            </div>
+                                        </>
                                     )}
-                                    <div className="flex items-center mb-1">
-                                        <Text className="text-sm mr-2">Tạm tính:</Text>
-                                        <Text className="text-sm">
-                                            {cart?.totalPrice?.toLocaleString("vi-VN")}₫
-                                        </Text>
-                                    </div>
-                                    <div className="flex items-center mb-1">
-                                        <Text className="text-sm mr-2">Phí vận chuyển:</Text>
-                                        <Text className="text-sm">
-                                            {SHIPPING_FEE.toLocaleString("vi-VN")}₫
-                                        </Text>
-                                    </div>
-                                    <div className="flex items-center">
-                                        <Text className="mr-2 text-red-500" style={{ fontSize: '16px' }}>Tổng cộng:</Text>
-                                        <Title level={4} style={{ color: "#ED1C24", margin: 0 }}>
-                                            {cart?.totalPrice ? (cart.totalPrice + SHIPPING_FEE).toLocaleString("vi-VN") : SHIPPING_FEE.toLocaleString("vi-VN")}₫
-                                        </Title>
-                                    </div>
                                 </div>
                             </Col>
                         </Row>

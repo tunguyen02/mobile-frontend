@@ -1,22 +1,22 @@
 import { useState, useEffect } from "react";
-import { 
-    Table, 
-    Button, 
-    Modal, 
-    Form, 
-    Input, 
-    DatePicker, 
-    message, 
-    Space, 
-    Tag, 
+import {
+    Table,
+    Button,
+    Modal,
+    Form,
+    Input,
+    DatePicker,
+    message,
+    Space,
+    Tag,
     Popconfirm,
     Select,
     InputNumber,
     Divider
 } from "antd";
-import { 
-    PlusOutlined, 
-    EditOutlined, 
+import {
+    PlusOutlined,
+    EditOutlined,
     DeleteOutlined,
     ThunderboltOutlined
 } from "@ant-design/icons";
@@ -71,11 +71,12 @@ const FlashSales = () => {
         if (record) {
             const productList = record.products.map(item => ({
                 productId: item.product._id,
+                originalPrice: item.product.price,
                 discountPrice: item.discountPrice,
                 quantity: item.quantity
             }));
             setSelectedProducts(productList);
-            
+
             form.setFieldsValue({
                 title: record.title,
                 timeRange: [moment(record.startTime), moment(record.endTime)],
@@ -112,8 +113,8 @@ const FlashSales = () => {
 
             if (editingFlashSale) {
                 await flashSaleService.updateFlashSale(
-                    editingFlashSale._id, 
-                    data, 
+                    editingFlashSale._id,
+                    data,
                     user?.accessToken
                 );
                 message.success('Flash Sale đã được cập nhật thành công!');
@@ -121,7 +122,7 @@ const FlashSales = () => {
                 await flashSaleService.createFlashSale(data, user?.accessToken);
                 message.success('Flash Sale đã được tạo thành công!');
             }
-            
+
             setIsModalVisible(false);
             form.resetFields();
             fetchFlashSales();
@@ -129,7 +130,7 @@ const FlashSales = () => {
             console.error('Error in handleSubmit:', error);
             const errorMsg = error.response?.data?.message || error.message || 'Đã xảy ra lỗi không xác định';
             message.error('Có lỗi xảy ra: ' + errorMsg);
-            
+
             // Log full error details in console
             if (error.response) {
                 console.error('Error response:', error.response.data);
@@ -149,12 +150,21 @@ const FlashSales = () => {
     };
 
     const addProduct = () => {
-        setSelectedProducts([...selectedProducts, { productId: '', discountPrice: 0, quantity: 1 }]);
+        setSelectedProducts([...selectedProducts, { productId: '', originalPrice: 0, discountPrice: 0, quantity: 1 }]);
     };
 
     const updateSelectedProduct = (index, field, value) => {
         const updatedProducts = [...selectedProducts];
         updatedProducts[index][field] = value;
+
+        // Nếu đổi sản phẩm, cập nhật giá gốc từ sản phẩm
+        if (field === 'productId') {
+            const selectedProduct = products.find(p => p._id === value);
+            if (selectedProduct) {
+                updatedProducts[index].originalPrice = selectedProduct.price;
+            }
+        }
+
         setSelectedProducts(updatedProducts);
     };
 
@@ -168,7 +178,7 @@ const FlashSales = () => {
         const now = new Date();
         const startTime = new Date(record.startTime);
         const endTime = new Date(record.endTime);
-        
+
         if (now < startTime) return 'upcoming';
         if (now > endTime) return 'ended';
         return 'active';
@@ -205,7 +215,7 @@ const FlashSales = () => {
                 const status = getFlashSaleStatus(record);
                 let color = 'blue';
                 let text = 'Sắp diễn ra';
-                
+
                 if (status === 'active') {
                     color = 'green';
                     text = 'Đang diễn ra';
@@ -213,7 +223,7 @@ const FlashSales = () => {
                     color = 'gray';
                     text = 'Đã kết thúc';
                 }
-                
+
                 return <Tag color={color}>{text}</Tag>;
             }
         },
@@ -222,10 +232,10 @@ const FlashSales = () => {
             key: 'action',
             render: (_, record) => (
                 <Space size="middle">
-                    <Button 
-                        type="primary" 
-                        icon={<EditOutlined />} 
-                        onClick={() => showModal(record)} 
+                    <Button
+                        type="primary"
+                        icon={<EditOutlined />}
+                        onClick={() => showModal(record)}
                         ghost
                     />
                     <Popconfirm
@@ -234,10 +244,10 @@ const FlashSales = () => {
                         okText="Có"
                         cancelText="Không"
                     >
-                        <Button 
-                            type="primary" 
-                            icon={<DeleteOutlined />} 
-                            danger 
+                        <Button
+                            type="primary"
+                            icon={<DeleteOutlined />}
+                            danger
                             ghost
                         />
                     </Popconfirm>
@@ -252,18 +262,18 @@ const FlashSales = () => {
                 <h1 className="text-2xl font-bold flex items-center">
                     <ThunderboltOutlined className="mr-2 text-yellow-500" /> Quản lý Flash Sale
                 </h1>
-                <Button 
-                    type="primary" 
-                    icon={<PlusOutlined />} 
+                <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
                     onClick={() => showModal()}
                 >
                     Tạo Flash Sale mới
                 </Button>
             </div>
 
-            <Table 
-                columns={columns} 
-                dataSource={flashSales} 
+            <Table
+                columns={columns}
+                dataSource={flashSales}
                 rowKey="_id"
                 loading={loading}
             />
@@ -301,10 +311,10 @@ const FlashSales = () => {
                     </Form.Item>
 
                     <Divider orientation="left">Danh sách sản phẩm</Divider>
-                    
+
                     {selectedProducts.map((item, index) => (
                         <div key={index} className="flex gap-2 mb-4">
-                            <div className="w-1/3">
+                            <div className="w-1/4">
                                 <Select
                                     placeholder="Chọn sản phẩm"
                                     className="w-full"
@@ -318,17 +328,30 @@ const FlashSales = () => {
                                     ))}
                                 </Select>
                             </div>
-                            <div className="w-1/4">
+                            <div className="w-1/5">
+                                <InputNumber
+                                    placeholder="Giá gốc"
+                                    className="w-full"
+                                    value={item.originalPrice}
+                                    disabled={true}
+                                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                                    parser={value => value.replace(/\./g, '')}
+                                    addonAfter="₫"
+                                />
+                            </div>
+                            <div className="w-1/5">
                                 <InputNumber
                                     placeholder="Giá khuyến mãi"
                                     className="w-full"
                                     value={item.discountPrice}
                                     onChange={(value) => updateSelectedProduct(index, 'discountPrice', value)}
                                     min={1}
-                                    addonAfter="đ"
+                                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                                    parser={value => value.replace(/\./g, '')}
+                                    addonAfter="₫"
                                 />
                             </div>
-                            <div className="w-1/4">
+                            <div className="w-1/5">
                                 <InputNumber
                                     placeholder="Số lượng"
                                     className="w-full"
@@ -337,9 +360,9 @@ const FlashSales = () => {
                                     min={1}
                                 />
                             </div>
-                            <Button 
-                                type="primary" 
-                                danger 
+                            <Button
+                                type="primary"
+                                danger
                                 onClick={() => removeProduct(index)}
                                 icon={<DeleteOutlined />}
                             />
@@ -347,10 +370,10 @@ const FlashSales = () => {
                     ))}
 
                     <Form.Item>
-                        <Button 
-                            type="dashed" 
-                            onClick={addProduct} 
-                            block 
+                        <Button
+                            type="dashed"
+                            onClick={addProduct}
+                            block
                             icon={<PlusOutlined />}
                         >
                             Thêm sản phẩm
@@ -360,9 +383,9 @@ const FlashSales = () => {
                     <Form.Item className="text-right">
                         <Space>
                             <Button onClick={handleCancel}>Hủy</Button>
-                            <Button 
-                                type="primary" 
-                                htmlType="submit" 
+                            <Button
+                                type="primary"
+                                htmlType="submit"
                                 disabled={selectedProducts.length === 0}
                             >
                                 {editingFlashSale ? "Cập nhật" : "Tạo mới"}
