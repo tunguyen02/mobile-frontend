@@ -18,9 +18,11 @@ import {
     PlusOutlined,
     EditOutlined,
     DeleteOutlined,
-    ThunderboltOutlined
+    ThunderboltOutlined,
+    InfoCircleOutlined
 } from "@ant-design/icons";
 import moment from "moment";
+import dayjs from 'dayjs';
 import { useSelector } from "react-redux";
 import flashSaleService from "../../services/flashSaleService";
 import productService from "../../services/productService";
@@ -31,6 +33,7 @@ const { Option } = Select;
 const FlashSales = () => {
     const [flashSales, setFlashSales] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [productsLoading, setProductsLoading] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [form] = Form.useForm();
     const [editingFlashSale, setEditingFlashSale] = useState(null);
@@ -42,22 +45,33 @@ const FlashSales = () => {
         setLoading(true);
         try {
             const data = await flashSaleService.getAllFlashSales();
-            setFlashSales(data.data || []);
+            if (data && data.data) {
+                console.log('Loaded flash sales:', data.data);
+                setFlashSales(data.data || []);
+            } else {
+                console.error('Invalid response format:', data);
+                setFlashSales([]);
+                message.error('Định dạng dữ liệu không hợp lệ');
+            }
         } catch (error) {
+            console.error('Error fetching flash sales:', error);
             message.error('Không thể tải dữ liệu Flash Sales');
-            console.error(error);
+            setFlashSales([]);
         } finally {
             setLoading(false);
         }
     };
 
     const fetchProducts = async () => {
+        setProductsLoading(true);
         try {
             const response = await productService.getAllProducts();
             setProducts(response.products || []);
         } catch (error) {
             message.error('Không thể tải dữ liệu sản phẩm');
             console.error(error);
+        } finally {
+            setProductsLoading(false);
         }
     };
 
@@ -66,22 +80,49 @@ const FlashSales = () => {
         fetchProducts();
     }, []);
 
+    // Thêm console.log để debug
+    useEffect(() => {
+        console.log('Current editing flash sale:', editingFlashSale);
+    }, [editingFlashSale]);
+
+    useEffect(() => {
+        console.log('Selected products:', selectedProducts);
+    }, [selectedProducts]);
+
     const showModal = (record = null) => {
         setEditingFlashSale(record);
         if (record) {
-            const productList = record.products.map(item => ({
-                productId: item.product._id,
-                originalPrice: item.product.price,
-                discountPrice: item.discountPrice,
-                quantity: item.quantity
-            }));
-            setSelectedProducts(productList);
+            try {
+                const productList = record.products.map(item => {
+                    // Kiểm tra nếu item.product là object (đã được populate) hoặc chỉ là id
+                    const productId = typeof item.product === 'object' ? item.product._id : item.product;
+                    const productPrice = typeof item.product === 'object' ? item.product.price : 0;
 
-            form.setFieldsValue({
-                title: record.title,
-                timeRange: [moment(record.startTime), moment(record.endTime)],
-                products: productList
-            });
+                    return {
+                        productId,
+                        originalPrice: productPrice,
+                        discountPrice: item.discountPrice,
+                        quantity: item.quantity,
+                        soldCount: item.soldCount || 0,
+                        initialQuantity: item.quantity,
+                        remainingQuantity: item.quantity - (item.soldCount || 0)
+                    };
+                });
+                setSelectedProducts(productList);
+
+                // Sử dụng dayjs thay vì moment cho antd 5, hoặc giữ moment nếu dùng antd 4
+                const startMoment = dayjs ? dayjs(record.startTime) : moment(record.startTime);
+                const endMoment = dayjs ? dayjs(record.endTime) : moment(record.endTime);
+
+                form.setFieldsValue({
+                    title: record.title,
+                    timeRange: [startMoment, endMoment],
+                    products: productList
+                });
+            } catch (error) {
+                console.error("Lỗi khi cài đặt giá trị form:", error);
+                message.error("Có lỗi xảy ra khi mở form chỉnh sửa");
+            }
         } else {
             form.resetFields();
             setSelectedProducts([]);
@@ -98,15 +139,33 @@ const FlashSales = () => {
 
     const handleSubmit = async (values) => {
         try {
+            const startTime = values.timeRange[0].toDate ? values.timeRange[0].toDate().toISOString() : values.timeRange[0].toISOString();
+            const endTime = values.timeRange[1].toDate ? values.timeRange[1].toDate().toISOString() : values.timeRange[1].toISOString();
+
+            const productsData = selectedProducts.map(item => {
+                if (editingFlashSale) {
+                    const newQty = item.soldCount + item.remainingQuantity;
+                    return {
+                        product: item.productId,
+                        discountPrice: item.discountPrice,
+                        quantity: newQty,
+                        soldCount: item.soldCount || 0
+                    };
+                } else {
+                    return {
+                        product: item.productId,
+                        discountPrice: item.discountPrice,
+                        quantity: item.quantity,
+                        soldCount: 0
+                    };
+                }
+            });
+
             const data = {
                 title: values.title,
-                startTime: values.timeRange[0].toISOString(),
-                endTime: values.timeRange[1].toISOString(),
-                products: selectedProducts.map(item => ({
-                    product: item.productId,
-                    discountPrice: item.discountPrice,
-                    quantity: item.quantity
-                }))
+                startTime,
+                endTime,
+                products: productsData
             };
 
             console.log('Submitting flash sale data:', data);
@@ -162,6 +221,14 @@ const FlashSales = () => {
             const selectedProduct = products.find(p => p._id === value);
             if (selectedProduct) {
                 updatedProducts[index].originalPrice = selectedProduct.price;
+
+                // Nếu đang chỉnh sửa một flashsale hiện có, đảm bảo các trường khác được tính lại
+                if (editingFlashSale) {
+                    // Đặt lại soldCount cho sản phẩm mới
+                    updatedProducts[index].soldCount = 0;
+                    // Cập nhật số lượng còn lại bằng số lượng
+                    updatedProducts[index].remainingQuantity = updatedProducts[index].quantity;
+                }
             }
         }
 
@@ -182,6 +249,12 @@ const FlashSales = () => {
         if (now < startTime) return 'upcoming';
         if (now > endTime) return 'ended';
         return 'active';
+    };
+
+    // Hàm định dạng tiền tệ
+    const formatCurrency = (value) => {
+        if (!value && value !== 0) return '';
+        return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ₫';
     };
 
     const columns = [
@@ -207,6 +280,17 @@ const FlashSales = () => {
             dataIndex: 'products',
             key: 'productCount',
             render: (products) => products.length
+        },
+        {
+            title: 'Đã bán',
+            key: 'soldCount',
+            render: (_, record) => {
+                // Tính tổng số sản phẩm đã bán
+                const totalSold = record.products.reduce((sum, item) => sum + (item.soldCount || 0), 0);
+                // Tính tổng số lượng sản phẩm
+                const totalQuantity = record.products.reduce((sum, item) => sum + item.quantity, 0);
+                return `${totalSold}/${totalQuantity}`;
+            }
         },
         {
             title: 'Trạng thái',
@@ -235,7 +319,31 @@ const FlashSales = () => {
                     <Button
                         type="primary"
                         icon={<EditOutlined />}
-                        onClick={() => showModal(record)}
+                        onClick={() => {
+                            console.log('Edit flash sale:', record);
+                            try {
+                                // Kiểm tra dữ liệu
+                                if (!record || !record.products) {
+                                    message.error('Dữ liệu flash sale không hợp lệ');
+                                    console.error('Invalid record:', record);
+                                    return;
+                                }
+
+                                // Kiểm tra cấu trúc sản phẩm
+                                for (const product of record.products) {
+                                    if (!product.product) {
+                                        message.error('Dữ liệu sản phẩm không hợp lệ');
+                                        console.error('Invalid product:', product);
+                                        return;
+                                    }
+                                }
+
+                                showModal(record);
+                            } catch (error) {
+                                console.error('Error opening edit modal:', error);
+                                message.error('Không thể mở form chỉnh sửa');
+                            }
+                        }}
                         ghost
                     />
                     <Popconfirm
@@ -313,52 +421,117 @@ const FlashSales = () => {
                     <Divider orientation="left">Danh sách sản phẩm</Divider>
 
                     {selectedProducts.map((item, index) => (
-                        <div key={index} className="flex gap-2 mb-4">
-                            <div className="w-1/4">
-                                <Select
-                                    placeholder="Chọn sản phẩm"
-                                    className="w-full"
-                                    value={item.productId || undefined}
-                                    onChange={(value) => updateSelectedProduct(index, 'productId', value)}
+                        <div key={index} className="flex gap-2 mb-4 items-start border p-3 rounded-md">
+                            <div className="flex-1">
+                                <Form.Item
+                                    label="Sản phẩm"
+                                    required
+                                    className="mb-2"
                                 >
-                                    {products.map(product => (
-                                        <Option key={product._id} value={product._id}>
-                                            {product.name}
-                                        </Option>
-                                    ))}
-                                </Select>
-                            </div>
-                            <div className="w-1/5">
-                                <InputNumber
-                                    placeholder="Giá gốc"
-                                    className="w-full"
-                                    value={item.originalPrice}
-                                    disabled={true}
-                                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                                    parser={value => value.replace(/\./g, '')}
-                                    addonAfter="₫"
-                                />
-                            </div>
-                            <div className="w-1/5">
-                                <InputNumber
-                                    placeholder="Giá khuyến mãi"
-                                    className="w-full"
-                                    value={item.discountPrice}
-                                    onChange={(value) => updateSelectedProduct(index, 'discountPrice', value)}
-                                    min={1}
-                                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                                    parser={value => value.replace(/\./g, '')}
-                                    addonAfter="₫"
-                                />
-                            </div>
-                            <div className="w-1/5">
-                                <InputNumber
-                                    placeholder="Số lượng"
-                                    className="w-full"
-                                    value={item.quantity}
-                                    onChange={(value) => updateSelectedProduct(index, 'quantity', value)}
-                                    min={1}
-                                />
+                                    <Select
+                                        value={item.productId || undefined}
+                                        onChange={(value) => updateSelectedProduct(index, 'productId', value)}
+                                        placeholder="Chọn sản phẩm"
+                                        className="w-full"
+                                        loading={productsLoading}
+                                        disabled={editingFlashSale && item.productId}
+                                    >
+                                        {products && products.length > 0 ? products.map(product => (
+                                            <Select.Option key={product._id} value={product._id}>
+                                                {product.name} - {formatCurrency(product.price)}
+                                            </Select.Option>
+                                        )) : (
+                                            <Select.Option value="" disabled>Không có sản phẩm</Select.Option>
+                                        )}
+                                    </Select>
+                                </Form.Item>
+
+                                <div className="flex gap-2">
+                                    <Form.Item
+                                        label="Giá gốc"
+                                        className="flex-1 mb-2"
+                                    >
+                                        <Input
+                                            value={formatCurrency(item.originalPrice)}
+                                            disabled
+                                        />
+                                    </Form.Item>
+
+                                    <Form.Item
+                                        label="Giá khuyến mãi"
+                                        className="flex-1 mb-2"
+                                        required
+                                    >
+                                        <InputNumber
+                                            value={item.discountPrice}
+                                            onChange={(value) => updateSelectedProduct(index, 'discountPrice', value)}
+                                            min={1}
+                                            className="w-full"
+                                            formatter={(value) => {
+                                                if (!value && value !== 0) return '';
+                                                return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                            }}
+                                            parser={(value) => {
+                                                if (!value) return 0;
+                                                return parseFloat(value.replace(/\./g, ''));
+                                            }}
+                                            addonAfter="₫"
+                                        />
+                                    </Form.Item>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <Form.Item
+                                        label={editingFlashSale ? "Số lượng còn lại" : "Số lượng"}
+                                        className="flex-1 mb-2"
+                                        required
+                                        tooltip={editingFlashSale ?
+                                            "Nhập số lượng sản phẩm còn lại. Tổng số lượng sẽ là số lượng còn lại + số lượng đã bán." :
+                                            "Nhập tổng số lượng sản phẩm cho Flash Sale"}
+                                    >
+                                        <InputNumber
+                                            value={editingFlashSale ? item.remainingQuantity : item.quantity}
+                                            onChange={(value) => {
+                                                const updatedProducts = [...selectedProducts];
+                                                if (editingFlashSale) {
+                                                    updatedProducts[index].remainingQuantity = value;
+                                                } else {
+                                                    updatedProducts[index].quantity = value;
+                                                }
+                                                setSelectedProducts(updatedProducts);
+                                            }}
+                                            min={1}
+                                            className="w-full"
+                                        />
+                                    </Form.Item>
+
+                                    {editingFlashSale && (
+                                        <Form.Item
+                                            label="Đã bán"
+                                            className="flex-1 mb-2"
+                                        >
+                                            <InputNumber
+                                                value={item.soldCount || 0}
+                                                disabled
+                                                className="w-full"
+                                            />
+                                        </Form.Item>
+                                    )}
+
+                                    {editingFlashSale && (
+                                        <Form.Item
+                                            label="Tổng số lượng sau cập nhật"
+                                            className="flex-1 mb-2"
+                                            tooltip="Đây là tổng số lượng sản phẩm sau khi cập nhật (Số lượng còn lại + Đã bán)"
+                                        >
+                                            <InputNumber
+                                                value={(item.remainingQuantity || 0) + (item.soldCount || 0)}
+                                                disabled
+                                                className="w-full"
+                                            />
+                                        </Form.Item>
+                                    )}
+                                </div>
                             </div>
                             <Button
                                 type="primary"
