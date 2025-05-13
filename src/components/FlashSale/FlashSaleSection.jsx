@@ -170,14 +170,39 @@ const FlashSaleSection = () => {
     // Lấy flash sale đầu tiên để hiển thị
     const currentFlashSale = activeFlashSales[0];
 
+    // Lọc các sản phẩm trùng lặp dựa trên product._id
+    const uniqueProducts = currentFlashSale ? currentFlashSale.products.reduce((unique, item) => {
+        const isDuplicate = unique.some((existingItem) =>
+            existingItem.product._id === item.product._id
+        );
+
+        if (!isDuplicate) {
+            unique.push(item);
+        } else {
+            console.log(`Duplicate product found: ${item.product.name} with ID ${item.product._id}`);
+        }
+
+        return unique;
+    }, []) : [];
+
+    // Log số lượng sản phẩm để debug
+    console.log(`Total unique products in flash sale: ${uniqueProducts.length}`);
+    uniqueProducts.forEach((item, index) => {
+        console.log(`${index + 1}. ${item.product.name} (ID: ${item.product._id})`);
+    });
+
+    // Tính toán số lượng slides cần hiển thị dựa trên số lượng sản phẩm thực tế
+    const maxSlidesToShow = Math.min(5, uniqueProducts.length);
+    const maxSlidesToScroll = Math.min(5, uniqueProducts.length);
+
     return (
-        <div className="flash-sale-section bg-black py-4 pb-8 my-8 rounded-lg shadow-xl relative">
+        <div className="flash-sale-section bg-black py-4 pb-8 my-6 rounded-lg shadow-xl relative">
             <div className="absolute left-5 top-14 lg:left-8 lg:top-14 text-white z-10">
                 <div className="text-sm text-yellow-500 font-semibold">KẾT THÚC TRONG</div>
             </div>
 
             {/* Logo FLASHSALE phong cách như hình */}
-            <div className="relative w-full flex justify-center mb-12 pt-6">
+            <div className="relative w-full flex justify-center mb-8 pt-6">
                 <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-0.5 w-16 bg-yellow-400 transform -rotate-45"></div>
                 <div className="absolute -right-2 top-1/2 -translate-y-1/2 h-0.5 w-16 bg-yellow-400 transform rotate-45"></div>
 
@@ -189,108 +214,210 @@ const FlashSaleSection = () => {
                 </div>
             </div>
 
-            <div className="px-6 md:px-12">
-                <Carousel
-                    arrows={true}
-                    nextArrow={<div className="custom-arrow next-arrow"><RightOutlined /></div>}
-                    prevArrow={<div className="custom-arrow prev-arrow"><LeftOutlined /></div>}
-                    dots={false}
-                    slidesToShow={5}
-                    slidesToScroll={5}
-                    responsive={[
-                        {
-                            breakpoint: 1280,
-                            settings: {
-                                slidesToShow: 4,
-                                slidesToScroll: 4
-                            }
-                        },
-                        {
-                            breakpoint: 1024,
-                            settings: {
-                                slidesToShow: 3,
-                                slidesToScroll: 3
-                            }
-                        },
-                        {
-                            breakpoint: 768,
-                            settings: {
-                                slidesToShow: 2,
-                                slidesToScroll: 2
-                            }
-                        },
-                        {
-                            breakpoint: 480,
-                            settings: {
-                                slidesToShow: 1,
-                                slidesToScroll: 1
-                            }
-                        }
-                    ]}
-                    className="flash-sale-carousel"
-                >
-                    {currentFlashSale.products.map((item) => {
-                        const product = item.product;
-                        const discountPercent = calculateDiscount(product.price, item.discountPrice);
+            <div className="px-4 md:px-10 mx-auto" style={{ maxWidth: '1400px' }}>
+                {uniqueProducts.length <= 2 ? (
+                    // Hiển thị dạng centered flex khi có ít sản phẩm (1-2 sản phẩm)
+                    <div className={`flex ${uniqueProducts.length === 1 ? 'justify-center' : 'justify-evenly'} flex-wrap gap-6`}>
+                        {uniqueProducts.map((item, index) => {
+                            const product = item.product;
+                            const discountPercent = calculateDiscount(product.price, item.discountPrice);
+                            const soldPercentage = Math.min(100, (item.soldCount / item.quantity) * 100);
+                            const hotSelling = soldPercentage > 50;
 
-                        // Tạo đối tượng thông tin flash sale để truyền cho trang chi tiết
-                        const flashSaleInfo = {
-                            flashSaleId: currentFlashSale._id,
-                            discountPrice: item.discountPrice,
-                            quantity: item.quantity,
-                            soldCount: item.soldCount,
-                            endTime: currentFlashSale.endTime
-                        };
+                            // Tạo đối tượng thông tin flash sale để truyền cho trang chi tiết
+                            const flashSaleInfo = {
+                                flashSaleId: currentFlashSale._id,
+                                discountPrice: item.discountPrice,
+                                quantity: item.quantity,
+                                soldCount: item.soldCount,
+                                endTime: currentFlashSale.endTime
+                            };
 
-                        return (
-                            <div key={product._id} className="px-2 pb-3">
-                                <div
-                                    className="flash-sale-product bg-zinc-900 rounded-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                                    onClick={() => handleViewProduct(product._id, flashSaleInfo)}
-                                >
-                                    <div className="relative bg-white p-4 flex justify-center items-center h-44">
-                                        <img
-                                            alt={product.name}
-                                            src={Array.isArray(product.imageUrl) && product.imageUrl.length > 0
-                                                ? product.imageUrl[0]
-                                                : (product.imageUrl || 'https://placehold.co/600x400?text=No+Image')}
-                                            className="h-full object-contain"
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = 'https://placehold.co/600x400?text=Error+Loading+Image';
-                                            }}
-                                        />
-                                        <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded">
-                                            -{discountPercent}%
-                                        </div>
-                                    </div>
-
-                                    <div className="p-3 text-center">
-                                        <h3 className="text-white text-sm h-10 line-clamp-2 leading-tight mb-2">{product.name}</h3>
-
-                                        <div className="flex flex-col items-center">
-                                            <div className="text-yellow-400 font-bold text-lg">
-                                                {item.discountPrice.toLocaleString('vi-VN')}₫
+                            return (
+                                <div key={`${product._id}-${index}`} className="flash-sale-item-wrapper" style={{ width: '220px', maxWidth: '100%' }}>
+                                    <div
+                                        className="flash-sale-product bg-zinc-900 rounded-lg overflow-hidden cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300"
+                                        onClick={() => handleViewProduct(product._id, flashSaleInfo)}
+                                    >
+                                        {/* Thêm tag "HOT" nếu đã bán hơn 50% */}
+                                        {hotSelling && (
+                                            <div className="absolute top-2 left-2 z-10 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                                HOT
                                             </div>
-                                            <div className="text-gray-400 text-xs line-through">
-                                                {product.price.toLocaleString('vi-VN')}₫
+                                        )}
+
+                                        <div className="relative bg-white p-4 flex justify-center items-center h-48">
+                                            <img
+                                                alt={product.name}
+                                                src={Array.isArray(product.imageUrl) && product.imageUrl.length > 0
+                                                    ? product.imageUrl[0]
+                                                    : (product.imageUrl || 'https://placehold.co/600x400?text=No+Image')}
+                                                className="h-full object-contain"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = 'https://placehold.co/600x400?text=Error+Loading+Image';
+                                                }}
+                                            />
+                                            <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+                                                -{discountPercent}%
                                             </div>
                                         </div>
 
-                                        <div className="mt-2 bg-yellow-500 bg-opacity-20 rounded-full h-5 relative overflow-hidden">
-                                            <div className="absolute bottom-0 left-0 w-full h-full bg-gradient-to-r from-orange-500 to-yellow-500"
-                                                style={{ width: `${Math.min(100, (item.soldCount / item.quantity) * 100)}%` }}>
+                                        <div className="p-4 text-center">
+                                            <h3 className="text-white text-base h-12 line-clamp-2 leading-tight mb-3 font-medium">{product.name}</h3>
+
+                                            <div className="flex flex-col items-center mb-4">
+                                                <div className="text-yellow-400 font-bold text-xl mb-1">
+                                                    {item.discountPrice.toLocaleString('vi-VN')}₫
+                                                </div>
+                                                <div className="text-gray-400 text-sm line-through">
+                                                    {product.price.toLocaleString('vi-VN')}₫
+                                                </div>
                                             </div>
-                                            <div className="relative z-10 text-center text-white text-xs leading-5">
-                                                Còn {item.quantity - item.soldCount}/{item.quantity}
+
+                                            <div className="relative pt-1">
+                                                <div className="overflow-hidden h-6 mb-1 text-xs flex rounded-full bg-yellow-800 bg-opacity-30">
+                                                    <div
+                                                        style={{ width: `${soldPercentage}%` }}
+                                                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-orange-500 to-yellow-500 transition-all duration-500"
+                                                    ></div>
+                                                    <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-medium">
+                                                        Còn {item.quantity - item.soldCount}/{item.quantity}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                </Carousel>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    // Sử dụng Carousel khi có nhiều sản phẩm (≥ 3)
+                    <Carousel
+                        arrows={uniqueProducts.length > 1}
+                        nextArrow={<div className="custom-arrow next-arrow"><RightOutlined /></div>}
+                        prevArrow={<div className="custom-arrow prev-arrow"><LeftOutlined /></div>}
+                        dots={false}
+                        slidesToShow={maxSlidesToShow}
+                        slidesToScroll={maxSlidesToScroll}
+                        infinite={uniqueProducts.length > maxSlidesToShow}
+                        adaptiveHeight={true}
+                        responsive={[
+                            {
+                                breakpoint: 1280,
+                                settings: {
+                                    slidesToShow: Math.min(4, uniqueProducts.length),
+                                    slidesToScroll: Math.min(4, uniqueProducts.length),
+                                    infinite: uniqueProducts.length > 4
+                                }
+                            },
+                            {
+                                breakpoint: 1024,
+                                settings: {
+                                    slidesToShow: Math.min(3, uniqueProducts.length),
+                                    slidesToScroll: Math.min(3, uniqueProducts.length),
+                                    infinite: uniqueProducts.length > 3
+                                }
+                            },
+                            {
+                                breakpoint: 768,
+                                settings: {
+                                    slidesToShow: Math.min(2, uniqueProducts.length),
+                                    slidesToScroll: Math.min(2, uniqueProducts.length),
+                                    infinite: uniqueProducts.length > 2
+                                }
+                            },
+                            {
+                                breakpoint: 480,
+                                settings: {
+                                    slidesToShow: 1,
+                                    slidesToScroll: 1,
+                                    infinite: uniqueProducts.length > 1
+                                }
+                            }
+                        ]}
+                        className="flash-sale-carousel"
+                    >
+                        {uniqueProducts.map((item, index) => {
+                            // Log vị trí của sản phẩm trong carousel
+                            console.log(`Rendering product at position ${index}: ${item.product.name}`);
+
+                            const product = item.product;
+                            const discountPercent = calculateDiscount(product.price, item.discountPrice);
+                            const soldPercentage = Math.min(100, (item.soldCount / item.quantity) * 100);
+                            const hotSelling = soldPercentage > 50;
+
+                            // Tạo đối tượng thông tin flash sale để truyền cho trang chi tiết
+                            const flashSaleInfo = {
+                                flashSaleId: currentFlashSale._id,
+                                discountPrice: item.discountPrice,
+                                quantity: item.quantity,
+                                soldCount: item.soldCount,
+                                endTime: currentFlashSale.endTime
+                            };
+
+                            return (
+                                <div key={`${product._id}-${index}`} className="px-2 pb-3">
+                                    <div
+                                        className="flash-sale-product bg-zinc-900 rounded-lg overflow-hidden cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300"
+                                        onClick={() => handleViewProduct(product._id, flashSaleInfo)}
+                                        style={{ maxWidth: '220px', margin: '0 auto' }}
+                                    >
+                                        {/* Thêm tag "HOT" nếu đã bán hơn 50% */}
+                                        {hotSelling && (
+                                            <div className="absolute top-2 left-2 z-10 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                                HOT
+                                            </div>
+                                        )}
+
+                                        <div className="relative bg-white p-4 flex justify-center items-center h-48">
+                                            <img
+                                                alt={product.name}
+                                                src={Array.isArray(product.imageUrl) && product.imageUrl.length > 0
+                                                    ? product.imageUrl[0]
+                                                    : (product.imageUrl || 'https://placehold.co/600x400?text=No+Image')}
+                                                className="h-full object-contain"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = 'https://placehold.co/600x400?text=Error+Loading+Image';
+                                                }}
+                                            />
+                                            <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+                                                -{discountPercent}%
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 text-center">
+                                            <h3 className="text-white text-base h-10 line-clamp-2 leading-tight mb-2 font-medium">{product.name}</h3>
+
+                                            <div className="flex flex-col items-center mb-3">
+                                                <div className="text-yellow-400 font-bold text-xl mb-1">
+                                                    {item.discountPrice.toLocaleString('vi-VN')}₫
+                                                </div>
+                                                <div className="text-gray-400 text-sm line-through">
+                                                    {product.price.toLocaleString('vi-VN')}₫
+                                                </div>
+                                            </div>
+
+                                            <div className="relative pt-1">
+                                                <div className="overflow-hidden h-6 mb-1 text-xs flex rounded-full bg-yellow-800 bg-opacity-30">
+                                                    <div
+                                                        style={{ width: `${soldPercentage}%` }}
+                                                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-orange-500 to-yellow-500 transition-all duration-500"
+                                                    ></div>
+                                                    <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-medium">
+                                                        Còn {item.quantity - item.soldCount}/{item.quantity}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </Carousel>
+                )}
             </div>
 
             {/* Hiển thị đếm ngược ở góc phải trên */}
@@ -306,11 +433,30 @@ const FlashSaleSection = () => {
 
             <style jsx global>{`
                 .flash-sale-carousel .slick-slide {
-                    padding: 0 4px;
+                    padding: 0 8px;
                 }
                 
                 .flash-sale-carousel .slick-track {
                     margin-left: 0;
+                    display: flex;
+                    align-items: stretch;
+                }
+                
+                .flash-sale-carousel .slick-slide > div {
+                    height: 100%;
+                }
+                
+                .flash-sale-product {
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                }
+                
+                .flash-sale-product > div:last-child {
+                    flex-grow: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
                 }
                 
                 .custom-arrow {
@@ -318,9 +464,9 @@ const FlashSaleSection = () => {
                     top: 40%;
                     transform: translateY(-50%);
                     z-index: 10;
-                    width: 32px;
-                    height: 32px;
-                    background: rgba(0, 0, 0, 0.5);
+                    width: 36px;
+                    height: 36px;
+                    background: rgba(0, 0, 0, 0.6);
                     border-radius: 50%;
                     display: flex !important;
                     align-items: center;
@@ -329,11 +475,13 @@ const FlashSaleSection = () => {
                     cursor: pointer;
                     opacity: 0.7;
                     transition: all 0.3s;
+                    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
                 }
                 
                 .custom-arrow:hover {
                     opacity: 1;
                     background: rgba(0, 0, 0, 0.8);
+                    transform: translateY(-50%) scale(1.1);
                 }
                 
                 .prev-arrow {
@@ -345,6 +493,10 @@ const FlashSaleSection = () => {
                 }
                 
                 /* Countdown styling */
+                .countdown-display {
+                    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+                }
+                
                 .ant-statistic-content {
                     font-size: inherit !important;
                 }
