@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import 'antd/dist/reset.css';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import productService from '../../services/productService';
 import productDetailService from '../../services/productDetailService';
-import { FaChevronLeft, FaChevronRight, FaShoppingCart, FaTruck, FaCheck, FaBox, FaInfoCircle, FaBolt, FaMicrochip, FaCamera, FaBatteryFull, FaMobileAlt } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaShoppingCart, FaTruck, FaCheck, FaBox, FaInfoCircle, FaBolt, FaMicrochip, FaCamera, FaBatteryFull, FaMobileAlt, FaExchangeAlt } from 'react-icons/fa';
 import { Tabs, Collapse, message, Spin, Badge, Divider, Breadcrumb, Card, Carousel, List, Button, Rate, Input, Modal, notification, Statistic } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { handleGetAccessToken } from '../../services/axiosJWT';
@@ -21,6 +21,7 @@ const { Countdown } = Statistic;
 
 const ProductDetail = () => {
     const { productId } = useParams();
+    const navigate = useNavigate();
     const dispatch = useDispatch();
     const [product, setProduct] = useState(null);
     const [productDetail, setProductDetail] = useState(null);
@@ -187,6 +188,37 @@ const ProductDetail = () => {
         setReviewModal(false);
         // Refresh trạng thái đánh giá
         checkUserReviewStatus();
+    };
+
+    const handleAddToCompare = () => {
+        // Kiểm tra localStorage để lấy danh sách sản phẩm so sánh hiện tại
+        let compareList = localStorage.getItem('compareProducts');
+        let productIds = [];
+
+        if (compareList) {
+            productIds = JSON.parse(compareList);
+        }
+
+        // Kiểm tra sản phẩm đã có trong danh sách so sánh chưa
+        if (productIds.includes(productId)) {
+            // Nếu sản phẩm đã có trong danh sách, chuyển đến trang so sánh
+            navigate(`/product/compare?ids=${productIds.join(',')}`);
+            return;
+        }
+
+        // Thêm sản phẩm vào danh sách so sánh
+        productIds.push(productId);
+
+        // Giới hạn số lượng sản phẩm so sánh (tối đa 4)
+        if (productIds.length > 4) {
+            productIds = productIds.slice(-4);
+        }
+
+        // Lưu danh sách mới vào localStorage
+        localStorage.setItem('compareProducts', JSON.stringify(productIds));
+
+        // Chuyển đến trang so sánh
+        navigate(`/product/compare?ids=${productIds.join(',')}`);
     };
 
     if (isPending) {
@@ -400,6 +432,14 @@ const ProductDetail = () => {
                                                 >
                                                     <FaShoppingCart className="mr-2" size={16} />
                                                     <span className="text-base">Thêm vào giỏ hàng</span>
+                                                </button>
+
+                                                <button
+                                                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all flex items-center justify-center"
+                                                    onClick={handleAddToCompare}
+                                                >
+                                                    <FaExchangeAlt className="mr-2" size={16} />
+                                                    <span className="text-base">So sánh sản phẩm</span>
                                                 </button>
                                             </div>
                                         </div>

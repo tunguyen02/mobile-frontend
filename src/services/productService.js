@@ -107,6 +107,16 @@ const productService = {
         const res = await axios.get(URL_BACKEND);
         return res.data;
     },
+
+    compareProducts: async (productIds) => {
+        try {
+            const response = await axios.post(`${apiUrl}/product/compare`, { productIds });
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi so sánh sản phẩm:', error);
+            throw error;
+        }
+    },
 };
 
 export default productService;
