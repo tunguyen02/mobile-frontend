@@ -49,7 +49,7 @@ const ProductReviews = ({ productId }) => {
         queryKey: ['user-can-review', productId],
         queryFn: async () => {
             if (!user) return { canReview: false };
-            
+
             try {
                 const accessToken = handleGetAccessToken();
                 const response = await axios.get(
@@ -90,7 +90,6 @@ const ProductReviews = ({ productId }) => {
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
-                <Title level={3} className="text-white m-0">Đánh giá sản phẩm</Title>
                 <div>
                     <Rate disabled allowHalf value={averageRating} className="text-yellow-500" />
                     <Text className="ml-2 text-white">{averageRating.toFixed(1)}/5</Text>
@@ -103,13 +102,13 @@ const ProductReviews = ({ productId }) => {
                     <div className="space-y-4">
                         {reviews.map((review) => {
                             const isCurrentUserReview = user && review.user._id === user._id;
-                            
+
                             return (
                                 <div key={review._id} className="p-4 bg-gray-800/50 rounded-lg border border-gray-700">
                                     <div className="flex items-center mb-3">
-                                        <Avatar 
-                                            src={review.user.avatarUrl || 'https://joeschmoe.io/api/v1/random'} 
-                                            size={40} 
+                                        <Avatar
+                                            src={review.user.avatarUrl || 'https://joeschmoe.io/api/v1/random'}
+                                            size={40}
                                         />
                                         <div className="ml-3">
                                             <div className="flex items-center">
@@ -121,16 +120,16 @@ const ProductReviews = ({ productId }) => {
                                             <Rate disabled allowHalf value={review.rating} className="text-yellow-500 text-sm" />
                                         </div>
                                     </div>
-                                    
+
                                     <div className="text-white my-3">{review.content}</div>
-                                    
+
                                     <div className="flex justify-between items-center mt-2">
                                         <Text className="text-gray-400">{formatDate(review.createdAt)}</Text>
                                         {isCurrentUserReview && (
-                                            <Button 
-                                                type="primary" 
+                                            <Button
+                                                type="primary"
                                                 size="small"
-                                                icon={<EditOutlined />} 
+                                                icon={<EditOutlined />}
                                                 onClick={() => handleEditReview(review)}
                                                 className="bg-blue-600 hover:bg-blue-700 border-0"
                                             >

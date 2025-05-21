@@ -307,14 +307,13 @@ const ProductDetail = () => {
                     <Breadcrumb
                         className="mb-4"
                         items={[
-                            { title: 'Trang chủ' },
-                            { title: product.category },
-                            { title: product.name },
+                            { title: <span className="text-white">Trang chủ /</span> },
+                            { title: <span className="text-white">{product.name}</span> },
                         ]}
                     />
 
                     {/* Product Overview Section */}
-                    <div className='bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700'>
+                    <div className='bg-gray-800 rounded-xl shadow-xl overfflow-hidden border border-gray-700'>
                         <div className='flex flex-col md:flex-row'>
                             {/* Left side - Product Images */}
                             <div className="w-full md:w-3/5 lg:w-2/3">
@@ -424,7 +423,8 @@ const ProductDetail = () => {
                                                         <Countdown
                                                             value={new Date(flashSaleInfo.endTime).getTime()}
                                                             format="HH:mm:ss"
-                                                            className="text-white font-medium"
+                                                            className="text-white font-bold text-lg"
+                                                            style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '1.5rem' }}
                                                         />
                                                         <div className="text-xs text-gray-300 mt-1">
                                                             Còn lại: {flashSaleInfo.quantity - flashSaleInfo.soldCount}/{flashSaleInfo.quantity}
