@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import 'antd/dist/reset.css';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import productService from '../../services/productService';
 import productDetailService from '../../services/productDetailService';
-import { FaChevronLeft, FaChevronRight, FaShoppingCart, FaTruck, FaCheck, FaBox, FaInfoCircle, FaBolt, FaMicrochip, FaCamera, FaBatteryFull, FaMobileAlt } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaShoppingCart, FaTruck, FaCheck, FaBox, FaInfoCircle, FaBolt, FaMicrochip, FaCamera, FaBatteryFull, FaMobileAlt, FaExchangeAlt } from 'react-icons/fa';
 import { Tabs, Collapse, message, Spin, Badge, Divider, Breadcrumb, Card, Carousel, List, Button, Rate, Input, Modal, notification, Statistic } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { handleGetAccessToken } from '../../services/axiosJWT';
@@ -21,6 +21,7 @@ const { Countdown } = Statistic;
 
 const ProductDetail = () => {
     const { productId } = useParams();
+    const navigate = useNavigate();
     const dispatch = useDispatch();
     const [product, setProduct] = useState(null);
     const [productDetail, setProductDetail] = useState(null);
@@ -189,6 +190,66 @@ const ProductDetail = () => {
         checkUserReviewStatus();
     };
 
+    const handleAddToCompare = () => {
+        // Kiểm tra localStorage để lấy danh sách sản phẩm so sánh hiện tại
+        let compareList = localStorage.getItem('compareProducts');
+        let productIds = [];
+
+        if (compareList) {
+            productIds = JSON.parse(compareList);
+        }
+
+        // Lấy giá hiện tại của sản phẩm (giá sale nếu có)
+        const productPrice = currentPrice;
+
+        // Thêm thông tin về flash sale
+        let saleParams = '';
+
+        // Nếu sản phẩm đang giảm giá, thêm thông tin giảm giá
+        if (savingPercentage > 0) {
+            saleParams = `&discount=${savingPercentage}`;
+
+            // Nếu đang trong flash sale, thêm thông tin flash sale
+            if (flashSaleInfo && isFlashSaleActive()) {
+                saleParams += '&isFlashSale=true';
+                // Thêm thông tin giá gốc
+                if (product?.originalPrice) {
+                    saleParams += `&originalPrice=${product.originalPrice}`;
+                }
+            }
+        }
+
+        console.log("Thông tin sản phẩm so sánh:", {
+            productId,
+            price: productPrice,
+            discount: savingPercentage,
+            isFlashSale: flashSaleInfo && isFlashSaleActive(),
+            originalPrice: product?.originalPrice,
+            url: `/product/compare?ids=${productIds.join(',')}&price=${productPrice}${saleParams}`
+        });
+
+        // Kiểm tra sản phẩm đã có trong danh sách so sánh chưa
+        if (productIds.includes(productId)) {
+            // Nếu sản phẩm đã có trong danh sách, chuyển đến trang so sánh với giá của sản phẩm hiện tại
+            navigate(`/product/compare?ids=${productIds.join(',')}&price=${productPrice}${saleParams}`);
+            return;
+        }
+
+        // Thêm sản phẩm vào đầu danh sách so sánh để đảm bảo nó là sản phẩm đầu tiên
+        productIds.unshift(productId);
+
+        // Giới hạn số lượng sản phẩm so sánh (tối đa 4)
+        if (productIds.length > 4) {
+            productIds = productIds.slice(0, 4);
+        }
+
+        // Lưu danh sách mới vào localStorage
+        localStorage.setItem('compareProducts', JSON.stringify(productIds));
+
+        // Chuyển đến trang so sánh với giá của sản phẩm hiện tại
+        navigate(`/product/compare?ids=${productIds.join(',')}&price=${productPrice}${saleParams}`);
+    };
+
     if (isPending) {
         return <Spin size="large" className="flex justify-center items-center min-h-screen" />;
     }
@@ -246,14 +307,13 @@ const ProductDetail = () => {
                     <Breadcrumb
                         className="mb-4"
                         items={[
-                            { title: 'Trang chủ' },
-                            { title: product.category },
-                            { title: product.name },
+                            { title: <span className="text-white">Trang chủ /</span> },
+                            { title: <span className="text-white">{product.name}</span> },
                         ]}
                     />
 
                     {/* Product Overview Section */}
-                    <div className='bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700'>
+                    <div className='bg-gray-800 rounded-xl shadow-xl overfflow-hidden border border-gray-700'>
                         <div className='flex flex-col md:flex-row'>
                             {/* Left side - Product Images */}
                             <div className="w-full md:w-3/5 lg:w-2/3">
@@ -363,7 +423,8 @@ const ProductDetail = () => {
                                                         <Countdown
                                                             value={new Date(flashSaleInfo.endTime).getTime()}
                                                             format="HH:mm:ss"
-                                                            className="text-white font-medium"
+                                                            className="text-white font-bold text-lg"
+                                                            style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '1.5rem' }}
                                                         />
                                                         <div className="text-xs text-gray-300 mt-1">
                                                             Còn lại: {flashSaleInfo.quantity - flashSaleInfo.soldCount}/{flashSaleInfo.quantity}
@@ -400,6 +461,14 @@ const ProductDetail = () => {
                                                 >
                                                     <FaShoppingCart className="mr-2" size={16} />
                                                     <span className="text-base">Thêm vào giỏ hàng</span>
+                                                </button>
+
+                                                <button
+                                                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all flex items-center justify-center"
+                                                    onClick={handleAddToCompare}
+                                                >
+                                                    <FaExchangeAlt className="mr-2" size={16} />
+                                                    <span className="text-base">So sánh sản phẩm</span>
                                                 </button>
                                             </div>
                                         </div>

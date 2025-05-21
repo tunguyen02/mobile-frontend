@@ -107,6 +107,131 @@ const productService = {
         const res = await axios.get(URL_BACKEND);
         return res.data;
     },
+
+    compareProducts: async (productIds) => {
+        try {
+            const response = await axios.post(`${apiUrl}/product/compare`, { productIds });
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi so sánh sản phẩm:', error);
+            throw error;
+        }
+    },
+
+    // Tìm sản phẩm theo khoảng giá
+    findProductsByPrice: async (targetPrice, range, limit) => {
+        try {
+            const params = { targetPrice };
+            if (range) params.range = range;
+            if (limit) params.limit = limit;
+
+            const response = await axios.get(`${apiUrl}/product/find-by-price`, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi tìm sản phẩm theo giá:', error);
+            throw error;
+        }
+    },
+
+    // Tìm sản phẩm theo camera
+    findProductsByCamera: async (cameraSpec, limit) => {
+        try {
+            const params = { cameraSpec };
+            if (limit) params.limit = limit;
+
+            const response = await axios.get(`${apiUrl}/product/find-by-camera`, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi tìm sản phẩm theo camera:', error);
+            throw error;
+        }
+    },
+
+    // Tìm sản phẩm theo pin
+    findProductsByBattery: async (batteryCapacity, limit) => {
+        try {
+            const params = { batteryCapacity };
+            if (limit) params.limit = limit;
+
+            const response = await axios.get(`${apiUrl}/product/find-by-battery`, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi tìm sản phẩm theo pin:', error);
+            throw error;
+        }
+    },
+
+    // Tìm sản phẩm cùng loại
+    findProductsBySeries: async (productName, limit) => {
+        try {
+            const params = { productName };
+            if (limit) params.limit = limit;
+
+            const response = await axios.get(`${apiUrl}/product/find-by-series`, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi tìm sản phẩm cùng loại:', error);
+            throw error;
+        }
+    },
+
+    // Tìm sản phẩm theo dung lượng bộ nhớ
+    findProductsByStorage: async (storage, limit) => {
+        try {
+            const params = { storage };
+            if (limit) params.limit = limit;
+
+            const response = await axios.get(`${apiUrl}/product/find-by-storage`, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi tìm sản phẩm theo dung lượng:', error);
+            throw error;
+        }
+    },
+
+    // Lấy danh sách các thông số camera distinct
+    getDistinctCameraSpecs: async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/product/distinct-camera-specs`);
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi lấy danh sách thông số camera:', error);
+            throw error;
+        }
+    },
+
+    // Lấy danh sách các dung lượng pin distinct
+    getDistinctBatteryCapacities: async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/product/distinct-battery-capacities`);
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi lấy danh sách dung lượng pin:', error);
+            throw error;
+        }
+    },
+
+    // Lấy danh sách các dung lượng bộ nhớ distinct
+    getDistinctStorageOptions: async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/product/distinct-storage-options`);
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi lấy danh sách dung lượng bộ nhớ:', error);
+            throw error;
+        }
+    },
+
+    // Lấy danh sách các series sản phẩm distinct
+    getDistinctProductSeries: async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/product/distinct-product-series`);
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi lấy danh sách loại sản phẩm:', error);
+            throw error;
+        }
+    },
 };
 
 export default productService;

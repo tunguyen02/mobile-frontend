@@ -20,6 +20,7 @@ import OrderDetails from "../pages/OrderDetails/OrderDetails";
 import ForgotPassword from "../pages/ForgotPassword/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword/ResetPassword";
 import FlashSales from "../pages/AdminPage/FlashSales";
+import ProductComparisonPage from "../pages/ProductComparison/ProductComparisonPage";
 
 export const routes = [
     {
@@ -50,6 +51,11 @@ export const routes = [
     {
         path: '/product/product-details/:productId',
         page: ProductDetails,
+        adminManage: false
+    },
+    {
+        path: '/product/compare',
+        page: ProductComparisonPage,
         adminManage: false
     },
     {
