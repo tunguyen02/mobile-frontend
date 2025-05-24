@@ -88,6 +88,36 @@ const orderService = {
 
         return response.data;
     },
+    // Phương thức để lấy thông tin đơn hàng từ trang success không yêu cầu token
+    getOrderById: async (orderId) => {
+        try {
+            const accessToken = localStorage.getItem("access_token")
+                ? JSON.parse(localStorage.getItem("access_token"))
+                : null;
+
+            if (!accessToken) {
+                console.warn("No access token found, using public endpoint");
+                // Dùng axios thông thường nếu không có token
+                const axios = (await import('axios')).default;
+                const response = await axios.get(`${apiUrl}/order/public/${orderId}`);
+                return response.data;
+            }
+
+            // Nếu có token, sử dụng endpoint có xác thực
+            const response = await axiosJWT.get(`${apiUrl}/order/details/${orderId}`, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Lấy thông tin đơn hàng thất bại:", error);
+            return {
+                status: 'ERR',
+                message: error.message
+            };
+        }
+    },
     countOrders: async () => {
         try {
             const response = await axiosJWT.get(`${apiUrl}/order/count`, {

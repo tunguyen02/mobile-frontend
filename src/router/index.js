@@ -124,6 +124,16 @@ export const routes = [
         adminManage: false
     },
     {
+        path: '/order/success',
+        page: OrderSuccess,
+        adminManage: false
+    },
+    {
+        path: '/order/failed',
+        page: OrderSuccess,
+        adminManage: false
+    },
+    {
         path: '/my-orders',
         page: MyOrders,
         adminManage: false

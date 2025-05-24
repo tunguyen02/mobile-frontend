@@ -1,54 +1,59 @@
 import React, { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Divider, Table, Typography, Result, Button, Tag, Spin } from "antd";
 import { formatCurrency, timeTranformFromMongoDB } from "../../utils/utils";
 import { ThunderboltOutlined } from "@ant-design/icons";
+import orderService from "../../services/orderService";
 const { Title } = Typography;
 
 function OrderSuccess() {
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [loading, setLoading] = React.useState(true);
     const [orderData, setOrderData] = React.useState(null);
     const [paymentData, setPaymentData] = React.useState(null);
     const [hasError, setHasError] = React.useState(false);
 
     useEffect(() => {
-        // Đảm bảo có thời gian kiểm tra dữ liệu
-        try {
-            const state = location.state || {};
-            if (state.order && state.payment) {
-                setOrderData(state.order);
-                setPaymentData(state.payment);
-
-                // Debug thông tin
-                console.log("Order Success Data:", state.order);
-
-                // Debug thông tin chi tiết sản phẩm
-                if (state.order?.products) {
-                    state.order.products.forEach(item => {
-                        console.log("Product in order:", {
-                            name: item.product?.name,
-                            price: item.price,
-                            originalPrice: item.originalPrice,
-                            productPrice: item.product?.price,
-                            productOriginalPrice: item.product?.originalPrice,
-                            isFlashSale: item.isFlashSale
-                        });
-                    });
+        const fetchOrderFromParams = async () => {
+            try {
+                // Kiểm tra xem có orderId từ query param không (chuyển hướng từ VNPay)
+                const orderId = searchParams.get('orderId');
+                if (orderId) {
+                    console.log("Fetching order details for orderId:", orderId);
+                    const result = await orderService.getOrderById(orderId);
+                    if (result.status === 'OK' && result.data) {
+                        console.log("Order details retrieved:", result.data);
+                        setOrderData(result.data.order);
+                        setPaymentData(result.data.payment);
+                        setLoading(false);
+                    } else {
+                        console.error("Failed to retrieve order details:", result);
+                        setHasError(true);
+                        setLoading(false);
+                    }
+                } else {
+                    // Nếu không có orderId, sử dụng dữ liệu từ state (cách cũ)
+                    const state = location.state || {};
+                    if (state.order && state.payment) {
+                        setOrderData(state.order);
+                        setPaymentData(state.payment);
+                        setLoading(false);
+                    } else {
+                        setHasError(true);
+                        setLoading(false);
+                    }
                 }
-
-                setLoading(false);
-            } else {
+            } catch (error) {
+                console.error("Error loading order data:", error);
                 setHasError(true);
                 setLoading(false);
             }
-        } catch (error) {
-            console.error("Error loading order data:", error);
-            setHasError(true);
-            setLoading(false);
-        }
-    }, [location]);
+        };
+
+        fetchOrderFromParams();
+    }, [location, searchParams]);
 
     const handleProductDetails = (productId) => {
         navigate(`/product/product-details/${productId}`);
