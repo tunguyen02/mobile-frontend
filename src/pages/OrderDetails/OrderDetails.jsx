@@ -7,7 +7,9 @@ import { handleGetAccessToken } from "../../services/axiosJWT";
 import orderService from "../../services/orderService";
 import ReviewButton from "../../components/ReviewButton/ReviewButton";
 import { ThunderboltOutlined, ClockCircleOutlined, DollarOutlined, SwapOutlined, StopOutlined } from "@ant-design/icons";
-const { Title } = Typography;
+import refundService from "../../services/refundService.js";
+import dayjs from "dayjs";
+const { Title, Text } = Typography;
 
 function OrderDetails() {
     const navigate = useNavigate();
@@ -154,9 +156,28 @@ function OrderDetails() {
 
                     if (result.success) {
                         message.success(result.message || 'Đã hủy đơn hàng thành công', 3);
-                        setTimeout(() => {
-                            refetch(); // Làm mới dữ liệu đơn hàng
-                        }, 1500);
+
+                        // Kiểm tra nếu có yêu cầu hoàn tiền
+                        if (result.hasRefund && result.refundInfo) {
+                            // Hiển thị thông báo về hoàn tiền
+                            Modal.success({
+                                title: 'Đã tạo yêu cầu hoàn tiền tự động',
+                                content: 'Đơn hàng đã thanh toán VNPay của bạn đã được hủy và hệ thống đã tự động tạo yêu cầu hoàn tiền. Bạn có muốn xem thông tin hoàn tiền không?',
+                                okText: 'Xem hoàn tiền',
+                                cancelText: 'Để sau',
+                                onOk: () => {
+                                    navigate('/my-refunds');
+                                },
+                                onCancel: () => {
+                                    refetch(); // Làm mới dữ liệu đơn hàng
+                                }
+                            });
+                        } else {
+                            // Nếu không có hoàn tiền, chỉ làm mới dữ liệu đơn hàng
+                            setTimeout(() => {
+                                refetch();
+                            }, 1500);
+                        }
                     } else {
                         message.error(result.message || 'Không thể hủy đơn hàng', 3);
                     }
@@ -330,6 +351,18 @@ function OrderDetails() {
                         ) : payment?.paymentStatus === "Expired" ? (
                             <div className="text-lg px-2 py-1 bg-red-500 w-fit rounded-lg font-bold text-white">
                                 Hết hạn thanh toán
+                            </div>
+                        ) : payment?.paymentStatus === "Refund_Pending" ? (
+                            <div className="text-lg px-2 py-1 bg-orange-500 w-fit rounded-lg font-bold text-white">
+                                Đang chờ hoàn tiền
+                            </div>
+                        ) : payment?.paymentStatus === "Refunded" ? (
+                            <div className="text-lg px-2 py-1 bg-cyan-500 w-fit rounded-lg font-bold text-white">
+                                Đã hoàn tiền
+                            </div>
+                        ) : payment?.paymentStatus === "Refund_Failed" ? (
+                            <div className="text-lg px-2 py-1 bg-red-500 w-fit rounded-lg font-bold text-white">
+                                Hoàn tiền thất bại
                             </div>
                         ) : (
                             <div className="text-lg px-2 py-1 bg-yellow-500 w-fit rounded-lg font-bold text-white">

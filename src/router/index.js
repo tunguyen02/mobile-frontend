@@ -21,6 +21,8 @@ import ForgotPassword from "../pages/ForgotPassword/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword/ResetPassword";
 import FlashSales from "../pages/AdminPage/FlashSales";
 import ProductComparisonPage from "../pages/ProductComparison/ProductComparisonPage";
+import MyRefunds from "../pages/MyRefunds/MyRefunds";
+import RefundManagement from "../pages/AdminPage/RefundManagement";
 
 export const routes = [
     {
@@ -119,6 +121,11 @@ export const routes = [
         adminManage: true
     },
     {
+        path: '/admin/refunds',
+        page: RefundManagement,
+        adminManage: true
+    },
+    {
         path: '/order-success',
         page: OrderSuccess,
         adminManage: false
@@ -141,6 +148,11 @@ export const routes = [
     {
         path: '/order/details/:orderId',
         page: OrderDetails,
+        adminManage: false
+    },
+    {
+        path: '/my-refunds',
+        page: MyRefunds,
         adminManage: false
     },
     {

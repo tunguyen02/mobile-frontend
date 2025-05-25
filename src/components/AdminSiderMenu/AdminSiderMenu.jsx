@@ -9,7 +9,8 @@ import {
     ShoppingOutlined,
     UserOutlined,
     CarryOutOutlined,
-    ThunderboltOutlined
+    ThunderboltOutlined,
+    DollarOutlined
 } from "@ant-design/icons";
 
 const AdminSiderMenu = () => {
@@ -56,6 +57,10 @@ const AdminSiderMenu = () => {
 
                 <Menu.Item key="6" icon={<ThunderboltOutlined />}>
                     <Link to="/admin/flash-sales">Flash Sales</Link>
+                </Menu.Item>
+
+                <Menu.Item key="7" icon={<DollarOutlined />}>
+                    <Link to="/admin/refunds">Quản lý hoàn tiền</Link>
                 </Menu.Item>
             </Menu>
         </div>

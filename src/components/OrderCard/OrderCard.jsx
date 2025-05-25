@@ -5,6 +5,7 @@ import { formatCurrency } from '../../utils/utils'
 import { useNavigate } from 'react-router-dom'
 import orderService from '../../services/orderService'
 import { handleGetAccessToken } from '../../services/axiosJWT'
+import refundService from '../../services/refundService'
 
 function OrderCard({ order }) {
     const navigate = useNavigate();
@@ -151,9 +152,28 @@ function OrderCard({ order }) {
 
                     if (result.success) {
                         message.success(result.message || 'Đã hủy đơn hàng thành công', 3);
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
+
+                        // Kiểm tra nếu có yêu cầu hoàn tiền
+                        if (result.hasRefund && result.refundInfo) {
+                            // Hiển thị thông báo về hoàn tiền
+                            Modal.success({
+                                title: 'Đã tạo yêu cầu hoàn tiền tự động',
+                                content: 'Đơn hàng đã thanh toán VNPay của bạn đã được hủy và hệ thống đã tự động tạo yêu cầu hoàn tiền. Bạn có muốn xem thông tin hoàn tiền không?',
+                                okText: 'Xem hoàn tiền',
+                                cancelText: 'Để sau',
+                                onOk: () => {
+                                    navigate('/my-refunds');
+                                },
+                                onCancel: () => {
+                                    window.location.reload();
+                                }
+                            });
+                        } else {
+                            // Nếu không có hoàn tiền, chỉ làm mới trang
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        }
                     } else {
                         message.error(result.message || 'Không thể hủy đơn hàng', 3);
                     }
@@ -172,7 +192,7 @@ function OrderCard({ order }) {
     const canCancel = order?.shippingStatus === 'Pending';
 
     return (
-        <div className='rounded-lg bg-white px-10 py-8 text-black'>
+        <div className='rounded-lg bg-white px-10 py-8 text-black border border-gray-200 shadow-md'>
             <div className='flex justify-between'>
                 <div className='text-gray-500 flex items-center'>
                     <TruckOutlined className="mr-2" /> {renderShippingStatusTag(order?.shippingStatus)}
@@ -192,6 +212,27 @@ function OrderCard({ order }) {
                         {isExpired && (
                             <Tag color="red">Đơn hàng đã quá hạn thanh toán</Tag>
                         )}
+                    </div>
+                )}
+                {order?.paymentStatus === "Refund_Pending" && (
+                    <div className='flex items-center gap-2'>
+                        <Tag color="orange" className="flex items-center">
+                            <DollarOutlined className="mr-1" /> Đang chờ hoàn tiền
+                        </Tag>
+                    </div>
+                )}
+                {order?.paymentStatus === "Refunded" && (
+                    <div className='flex items-center gap-2'>
+                        <Tag color="cyan" className="flex items-center">
+                            <DollarOutlined className="mr-1" /> Đã hoàn tiền
+                        </Tag>
+                    </div>
+                )}
+                {order?.paymentStatus === "Refund_Failed" && (
+                    <div className='flex items-center gap-2'>
+                        <Tag color="red" className="flex items-center">
+                            <DollarOutlined className="mr-1" /> Hoàn tiền thất bại
+                        </Tag>
                     </div>
                 )}
             </div>
