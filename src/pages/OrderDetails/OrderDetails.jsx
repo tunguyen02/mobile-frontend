@@ -344,18 +344,6 @@ function OrderDetails() {
                                 </Tag>
                             </Tooltip>
                         )}
-
-                        {canCancel && (
-                            <Button
-                                type="primary"
-                                danger
-                                icon={<StopOutlined />}
-                                onClick={handleCancelOrder}
-                                className="mt-2"
-                            >
-                                Hủy đơn hàng
-                            </Button>
-                        )}
                     </div>
                 </div>
                 <Divider />
@@ -430,6 +418,20 @@ function OrderDetails() {
                         </div>
                     </div>
                 </div>
+
+                {canCancel && (
+                    <div className="px-16 py-3 mt-4 flex justify-end">
+                        <Button
+                            type="primary"
+                            danger
+                            icon={<StopOutlined />}
+                            onClick={handleCancelOrder}
+                            size="large"
+                        >
+                            Hủy đơn hàng
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );
