@@ -13,7 +13,8 @@ import {
     Divider,
     Input,
     Space,
-    Tooltip
+    Tooltip,
+    Descriptions
 } from "antd";
 import { useState } from "react";
 import orderService from "../../services/orderService";
@@ -103,6 +104,11 @@ const Orders = () => {
         try {
             const values = await form.validateFields();
 
+            // Nếu là VNPay, không cho phép sửa trạng thái thanh toán
+            if (currentOrder.payment.paymentMethod === 'VNPay') {
+                values.paymentStatus = currentOrder.payment.paymentStatus;
+            }
+
             await editOrderMutation.mutateAsync({
                 orderId: currentOrder.order._id,
                 data: values,
@@ -160,13 +166,17 @@ const Orders = () => {
             render: (text) => {
                 const statusMap = {
                     Pending: "Chờ xử lý",
+                    Processing: "Đang xử lý",
                     Shipping: "Đang giao",
                     Completed: "Hoàn thành",
+                    Cancelled: "Đã hủy"
                 };
                 let color = "default";
                 if (text === "Pending") color = "orange";
+                else if (text === "Processing") color = "purple";
                 else if (text === "Shipping") color = "blue";
                 else if (text === "Completed") color = "green";
+                else if (text === "Cancelled") color = "red";
 
                 return <Tag color={color}>{statusMap[text] || "Không xác định"}</Tag>;
             },
@@ -177,14 +187,27 @@ const Orders = () => {
             title: "Trạng thái thanh toán",
             dataIndex: ["payment", "paymentStatus"],
             key: "paymentStatus",
-            render: (text) => {
+            render: (text, record) => {
                 const paymentMap = {
                     Pending: "Chưa thanh toán",
                     Completed: "Đã thanh toán",
+                    Expired: "Hết hạn thanh toán",
+                    Refund_Pending: "Đang chờ hoàn tiền",
+                    Refunded: "Đã hoàn tiền",
+                    Refund_Failed: "Hoàn tiền thất bại"
                 };
-                return <Tag color={text === "Pending" ? "red" : "green"}>{paymentMap[text] || "Không xác định"}</Tag>;
+
+                let color = "default";
+                if (text === "Pending") color = "orange";
+                else if (text === "Completed") color = "green";
+                else if (text === "Expired") color = "red";
+                else if (text === "Refund_Pending") color = "blue";
+                else if (text === "Refunded") color = "cyan";
+                else if (text === "Refund_Failed") color = "red";
+
+                return <Tag color={color}>{paymentMap[text] || "Không xác định"}</Tag>;
             },
-            width: 130,
+            width: 150,
             align: "center"
         },
         {
@@ -306,19 +329,43 @@ const Orders = () => {
                         rules={[{ required: true, message: "Vui lòng chọn trạng thái!" }]}>
                         <Select>
                             <Select.Option value="Pending">Chờ xử lý</Select.Option>
+                            <Select.Option value="Processing">Đang xử lý</Select.Option>
                             <Select.Option value="Shipping">Đang giao hàng</Select.Option>
                             <Select.Option value="Completed">Hoàn thành</Select.Option>
+                            <Select.Option value="Cancelled">Đã hủy</Select.Option>
                         </Select>
                     </Form.Item>
                     <Form.Item
                         name="paymentStatus"
                         label="Trạng thái thanh toán"
                         rules={[{ required: true, message: "Vui lòng chọn trạng thái!" }]}>
-                        <Select>
-                            <Select.Option value="Pending">Chưa thanh toán</Select.Option>
-                            <Select.Option value="Completed">Đã thanh toán</Select.Option>
-                        </Select>
+                        {currentOrder?.payment?.paymentMethod === 'VNPay' ? (
+                            <Select disabled>
+                                <Select.Option value={currentOrder?.payment?.paymentStatus}>
+                                    {currentOrder?.payment?.paymentStatus === 'Pending' && 'Chưa thanh toán'}
+                                    {currentOrder?.payment?.paymentStatus === 'Completed' && 'Đã thanh toán'}
+                                    {currentOrder?.payment?.paymentStatus === 'Expired' && 'Hết hạn thanh toán'}
+                                    {currentOrder?.payment?.paymentStatus === 'Refund_Pending' && 'Đang chờ hoàn tiền'}
+                                    {currentOrder?.payment?.paymentStatus === 'Refunded' && 'Đã hoàn tiền'}
+                                    {currentOrder?.payment?.paymentStatus === 'Refund_Failed' && 'Hoàn tiền thất bại'}
+                                </Select.Option>
+                            </Select>
+                        ) : (
+                            <Select>
+                                <Select.Option value="Pending">Chưa thanh toán</Select.Option>
+                                <Select.Option value="Completed">Đã thanh toán</Select.Option>
+                            </Select>
+                        )}
                     </Form.Item>
+                    {currentOrder?.payment?.paymentMethod === 'VNPay' && (
+                        <div className="mb-4">
+                            <Text type="warning">
+                                Trạng thái thanh toán của đơn hàng VNPay được xử lý tự động.
+                                {currentOrder?.payment?.paymentStatus.includes('Refund') &&
+                                    ' Hoàn tiền được quản lý trong phần Quản lý hoàn tiền.'}
+                            </Text>
+                        </div>
+                    )}
                 </Form>
             </Modal>
 

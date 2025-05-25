@@ -88,6 +88,90 @@ const orderService = {
 
         return response.data;
     },
+    // Phương thức thanh toán lại đơn hàng VNPay
+    repayOrder: async (accessToken, orderId) => {
+        try {
+            const response = await axiosJWT.post(
+                `${apiUrl}/payment/repay/${orderId}`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Thanh toán lại thất bại:", error);
+            throw error;
+        }
+    },
+    // Phương thức hủy đơn hàng
+    cancelOrder: async (accessToken, orderId) => {
+        try {
+            const response = await axiosJWT.post(
+                `${apiUrl}/order/cancel/${orderId}`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Hủy đơn hàng thất bại:", error);
+            throw error;
+        }
+    },
+    // Phương thức đổi phương thức thanh toán từ VNPay sang COD
+    changePaymentMethod: async (accessToken, orderId, newPaymentMethod) => {
+        try {
+            const response = await axiosJWT.patch(
+                `${apiUrl}/order/change-payment-method/${orderId}`,
+                { paymentMethod: newPaymentMethod },
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Đổi phương thức thanh toán thất bại:", error);
+            throw error;
+        }
+    },
+    // Phương thức để lấy thông tin đơn hàng từ trang success không yêu cầu token
+    getOrderById: async (orderId) => {
+        try {
+            const accessToken = localStorage.getItem("access_token")
+                ? JSON.parse(localStorage.getItem("access_token"))
+                : null;
+
+            if (!accessToken) {
+                console.warn("No access token found, using public endpoint");
+                // Dùng axios thông thường nếu không có token
+                const axios = (await import('axios')).default;
+                const response = await axios.get(`${apiUrl}/order/public/${orderId}`);
+                return response.data;
+            }
+
+            // Nếu có token, sử dụng endpoint có xác thực
+            const response = await axiosJWT.get(`${apiUrl}/order/details/${orderId}`, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Lấy thông tin đơn hàng thất bại:", error);
+            return {
+                status: 'ERR',
+                message: error.message
+            };
+        }
+    },
     countOrders: async () => {
         try {
             const response = await axiosJWT.get(`${apiUrl}/order/count`, {
