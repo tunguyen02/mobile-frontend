@@ -13,9 +13,10 @@ import {
     message,
     Spin,
     Tag,
+    Modal,
 } from "antd";
 import addressVietNam from "../../constants/addressConstants";
-import { CloseOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { CloseOutlined, ThunderboltOutlined, LoadingOutlined } from "@ant-design/icons";
 import { useDispatch, useSelector } from "react-redux";
 import { useMutation } from "@tanstack/react-query";
 import cartService from "../../services/cartService";
@@ -35,6 +36,7 @@ const CartPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [flashSaleProducts, setFlashSaleProducts] = useState({});
+    const [isRedirecting, setIsRedirecting] = useState(false);
 
     // Kiểm tra các sản phẩm Flash Sale từ localStorage
     useEffect(() => {
@@ -241,11 +243,23 @@ const CartPage = () => {
     //Create order
     const createOrderMutation = useMutation({
         mutationFn: async ({ shippingInfo, paymentMethod, cartWithFlashSale }) => {
+            // For VNPay payments, show loading state immediately
+            if (paymentMethod === "VNPay") {
+                setIsRedirecting(true);
+            }
             const accessToken = handleGetAccessToken();
             return orderService.createOrder(accessToken, shippingInfo, paymentMethod, cartWithFlashSale);
         },
         onSuccess: (data) => {
-            message.success(data?.message, 3);
+            // Chỉ hiển thị thông báo thành công nếu là COD
+            if (data.paymentMethod === "COD") {
+                message.success(data?.message, 3);
+                // For COD, clear cart immediately
+                dispatch(resetCart());
+            } else if (data.paymentMethod === "VNPay") {
+                // For VNPay, we've already set isRedirecting to true in mutationFn
+                message.loading("Đang chuyển hướng đến cổng thanh toán VNPay...", 2);
+            }
 
             // Cập nhật số lượng Flash Sale đã bán trong localStorage
             try {
@@ -274,20 +288,23 @@ const CartPage = () => {
                 console.error("Lỗi khi cập nhật số lượng Flash Sale:", error);
             }
 
-            dispatch(resetCart());
             if (data.paymentUrl) {
-                window.location.href = data.paymentUrl;
+                // Đối với VNPay, chuyển hướng đến trang thanh toán
+                // Đặt một timeout lớn hơn để hiển thị modal loading lâu hơn
+                setTimeout(() => {
+                    // Reset cart right before redirecting to VNPay
+                    dispatch(resetCart());
+                    window.location.href = data.paymentUrl;
+                }, 2000);
             } else {
-                navigate("/order-success", {
-                    state: {
-                        order: data?.newOrder,
-                        payment: data?.newPayment,
-                    },
-                });
+                // Đối với COD, chuyển hướng đến trang chi tiết đơn hàng thay vì trang thành công
+                dispatch(resetCart());
+                navigate(`/order/details/${data?.newOrder?._id}`);
             }
         },
         onError: (error) => {
-            message.error(error?.respond?.message, 3);
+            setIsRedirecting(false);
+            message.error(error?.respond?.message || "Đã có lỗi xảy ra khi tạo đơn hàng", 3);
         },
     });
 
@@ -353,10 +370,26 @@ const CartPage = () => {
 
     return (
         <Spin
-            spinning={
-                updateProductMutation?.isPendingUpdate || createOrderMutation?.isPending
-            }
+            spinning={updateProductMutation?.isPendingUpdate || createOrderMutation?.isPending}
+            tip={createOrderMutation?.isPending ? "Đang xử lý đơn hàng..." : "Đang cập nhật..."}
         >
+            {/* Hiển thị modal chuyển hướng nếu đang chuyển hướng đến VNPay */}
+            <Modal
+                open={isRedirecting}
+                closable={false}
+                footer={null}
+                centered
+                className="vnpay-redirect-modal"
+                maskStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.65)' }}
+            >
+                <div className="text-center py-6">
+                    <LoadingOutlined style={{ fontSize: 64, color: '#1890ff', marginBottom: 24 }} spin />
+                    <Title level={3} style={{ marginBottom: 16 }}>Đang chuyển hướng đến cổng thanh toán VNPay</Title>
+                    <p style={{ fontSize: 16 }}>Vui lòng không đóng trình duyệt hoặc tải lại trang...</p>
+                    <p style={{ fontSize: 14, color: '#888', marginTop: 12 }}>Bạn sẽ được chuyển hướng tự động sau vài giây</p>
+                </div>
+            </Modal>
+
             <div className="min-h-screen bg-gray-100 p-8">
                 <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg">
                     {/* Tiêu đề */}
@@ -592,8 +625,10 @@ const CartPage = () => {
                                         type="primary"
                                         className="w-full py-6 font-bold"
                                         htmlType="submit"
+                                        loading={createOrderMutation.isPending && !isRedirecting}
+                                        disabled={createOrderMutation.isPending || isRedirecting}
                                     >
-                                        Đặt hàng
+                                        {isRedirecting ? "Đang chuyển hướng đến VNPay..." : "Đặt hàng"}
                                     </Button>
                                 </Form.Item>
                             </Form>

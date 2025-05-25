@@ -88,6 +88,60 @@ const orderService = {
 
         return response.data;
     },
+    // Phương thức thanh toán lại đơn hàng VNPay
+    repayOrder: async (accessToken, orderId) => {
+        try {
+            const response = await axiosJWT.post(
+                `${apiUrl}/payment/repay/${orderId}`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Thanh toán lại thất bại:", error);
+            throw error;
+        }
+    },
+    // Phương thức hủy đơn hàng
+    cancelOrder: async (accessToken, orderId) => {
+        try {
+            const response = await axiosJWT.post(
+                `${apiUrl}/order/cancel/${orderId}`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Hủy đơn hàng thất bại:", error);
+            throw error;
+        }
+    },
+    // Phương thức đổi phương thức thanh toán từ VNPay sang COD
+    changePaymentMethod: async (accessToken, orderId, newPaymentMethod) => {
+        try {
+            const response = await axiosJWT.patch(
+                `${apiUrl}/order/change-payment-method/${orderId}`,
+                { paymentMethod: newPaymentMethod },
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Đổi phương thức thanh toán thất bại:", error);
+            throw error;
+        }
+    },
     // Phương thức để lấy thông tin đơn hàng từ trang success không yêu cầu token
     getOrderById: async (orderId) => {
         try {

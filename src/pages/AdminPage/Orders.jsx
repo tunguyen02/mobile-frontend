@@ -160,13 +160,17 @@ const Orders = () => {
             render: (text) => {
                 const statusMap = {
                     Pending: "Chờ xử lý",
+                    Processing: "Đang xử lý",
                     Shipping: "Đang giao",
                     Completed: "Hoàn thành",
+                    Cancelled: "Đã hủy"
                 };
                 let color = "default";
                 if (text === "Pending") color = "orange";
+                else if (text === "Processing") color = "purple";
                 else if (text === "Shipping") color = "blue";
                 else if (text === "Completed") color = "green";
+                else if (text === "Cancelled") color = "red";
 
                 return <Tag color={color}>{statusMap[text] || "Không xác định"}</Tag>;
             },
@@ -306,8 +310,10 @@ const Orders = () => {
                         rules={[{ required: true, message: "Vui lòng chọn trạng thái!" }]}>
                         <Select>
                             <Select.Option value="Pending">Chờ xử lý</Select.Option>
+                            <Select.Option value="Processing">Đang xử lý</Select.Option>
                             <Select.Option value="Shipping">Đang giao hàng</Select.Option>
                             <Select.Option value="Completed">Hoàn thành</Select.Option>
+                            <Select.Option value="Cancelled">Đã hủy</Select.Option>
                         </Select>
                     </Form.Item>
                     <Form.Item
