@@ -5,9 +5,29 @@ const apiUrl = import.meta.env.VITE_API_URL;
 const productService = {
     getAllProducts: async (queries) => {
         const URL_BACKEND = `${apiUrl}/product/get-all`;
+        console.log("Sending API request to:", URL_BACKEND);
+        console.log("With queries:", queries);
+
+        // Xử lý các tham số trong queries một cách rõ ràng
+        const params = { ...queries };
+
+        // Đảm bảo selectedBrands được gửi đúng cách
+        if (params.selectedBrands && Array.isArray(params.selectedBrands)) {
+            // Chuyển đổi mảng thành chuỗi nếu có nhiều phần tử
+            if (params.selectedBrands.length > 1) {
+                params.selectedBrands = params.selectedBrands;
+            } else if (params.selectedBrands.length === 1) {
+                // Nếu chỉ có một phần tử, không cần mảng
+                params.selectedBrands = params.selectedBrands[0];
+            }
+            console.log("Selected brands processed:", params.selectedBrands);
+        }
+
         const res = await axios.get(URL_BACKEND, {
-            params: queries,
+            params: params,
         });
+
+        console.log("API response:", res.data);
         return res.data;
     },
 
