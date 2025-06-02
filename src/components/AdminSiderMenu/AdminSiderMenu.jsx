@@ -10,7 +10,8 @@ import {
     UserOutlined,
     CarryOutOutlined,
     ThunderboltOutlined,
-    DollarOutlined
+    DollarOutlined,
+    MessageOutlined
 } from "@ant-design/icons";
 
 const AdminSiderMenu = () => {
@@ -61,6 +62,10 @@ const AdminSiderMenu = () => {
 
                 <Menu.Item key="7" icon={<DollarOutlined />}>
                     <Link to="/admin/refunds">Quản lý hoàn tiền</Link>
+                </Menu.Item>
+
+                <Menu.Item key="8" icon={<MessageOutlined />}>
+                    <Link to="/admin/chats">Customer Chat</Link>
                 </Menu.Item>
             </Menu>
         </div>

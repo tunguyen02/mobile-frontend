@@ -1,10 +1,19 @@
 import axios from "axios";
 const apiUrl = import.meta.env.VITE_API_URL;
 
+console.log("Brand service API URL:", apiUrl);
+
 const brandService = {
     getAllBrands: async () => {
-        const respond = await axios.get(`${apiUrl}/brand/get-all`);
-        return respond.data;
+        try {
+            console.log("Calling API:", `${apiUrl}/brand/get-all`);
+            const response = await axios.get(`${apiUrl}/brand/get-all`);
+            console.log("Brand API response:", response);
+            return response.data;
+        } catch (error) {
+            console.error("Error in getAllBrands:", error);
+            throw error;
+        }
     },
 
     getBrandByName: async (brandName) => {

@@ -1,5 +1,6 @@
 import HeaderNavbar from '../../components/HeaderNavbar/HeaderNavbar'
 import Footer from '../../components/Footer/Footer'
+import ChatBubble from '../../components/ChatBubble/ChatBubble'
 import { useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
@@ -49,6 +50,7 @@ function ClientPage({ children }) {
             <HeaderNavbar />
             {children}
             <Footer />
+            <ChatBubble />
         </div>
     )
 }

@@ -23,6 +23,7 @@ import FlashSales from "../pages/AdminPage/FlashSales";
 import ProductComparisonPage from "../pages/ProductComparison/ProductComparisonPage";
 import MyRefunds from "../pages/MyRefunds/MyRefunds";
 import RefundManagement from "../pages/AdminPage/RefundManagement";
+import AdminChats from "../pages/AdminPage/AdminChats";
 
 export const routes = [
     {
@@ -159,5 +160,10 @@ export const routes = [
         path: '/user/change-password',
         page: ChangePassword,
         adminManage: false
+    },
+    {
+        path: '/admin/chats',
+        page: AdminChats,
+        adminManage: true
     }
 ];
