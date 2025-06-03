@@ -37,27 +37,27 @@ const AdminSiderMenu = () => {
                 defaultSelectedKeys={["1"]}
             >
                 <Menu.Item key="1" icon={<DashboardOutlined />}>
-                    <Link to="/admin/dashboard">Dashboard</Link>
+                    <Link to="/admin/dashboard">Trang chủ</Link>
                 </Menu.Item>
 
                 <Menu.Item key="2" icon={<CarryOutOutlined />}>
-                    <Link to="/admin/brands">Brands</Link>
+                    <Link to="/admin/brands">Thương hiệu</Link>
                 </Menu.Item>
 
                 <Menu.Item key="3" icon={<ShoppingCartOutlined />}>
-                    <Link to="/admin/products">Products</Link>
+                    <Link to="/admin/products">Sản phẩm</Link>
                 </Menu.Item>
 
                 <Menu.Item key="4" icon={<ShoppingOutlined />}>
-                    <Link to="/admin/orders">Orders</Link>
+                    <Link to="/admin/orders">Đơn hàng</Link>
                 </Menu.Item>
 
                 <Menu.Item key="5" icon={<UserOutlined />}>
-                    <Link to="/admin/users">Users</Link>
+                    <Link to="/admin/users">Người dùng</Link>
                 </Menu.Item>
 
                 <Menu.Item key="6" icon={<ThunderboltOutlined />}>
-                    <Link to="/admin/flash-sales">Flash Sales</Link>
+                    <Link to="/admin/flash-sales">Flash Sale</Link>
                 </Menu.Item>
 
                 <Menu.Item key="7" icon={<DollarOutlined />}>
@@ -65,7 +65,7 @@ const AdminSiderMenu = () => {
                 </Menu.Item>
 
                 <Menu.Item key="8" icon={<MessageOutlined />}>
-                    <Link to="/admin/chats">Customer Chat</Link>
+                    <Link to="/admin/chats">CSKH</Link>
                 </Menu.Item>
             </Menu>
         </div>

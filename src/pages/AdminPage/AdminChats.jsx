@@ -373,7 +373,7 @@ const AdminChats = () => {
 
     return (
         <div className="h-screen flex flex-col overflow-hidden p-6 pb-4">
-            <Title level={2} className="mb-4">Customer Support Chats</Title>
+            <Title level={2} className="mb-4">Chăm sóc khách hàng</Title>
 
             <div className="flex gap-6 flex-1 overflow-hidden" style={{ maxHeight: "calc(100vh - 150px)" }}>
                 {/* Danh sách chat bên trái */}
