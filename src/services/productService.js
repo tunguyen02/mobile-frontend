@@ -39,6 +39,12 @@ const productService = {
         return res.data;
     },
 
+    getProductDetail: async (productId) => {
+        const URL_BACKEND = `${apiUrl}/product-detail/${productId}`;
+        const res = await axios.get(URL_BACKEND);
+        return res.data;
+    },
+
     getProductBySlug: async (slug) => {
         const URL_BACKEND = `${apiUrl}/product/${slug}`;
         const res = await axios.get(URL_BACKEND);
@@ -130,7 +136,44 @@ const productService = {
 
     compareProducts: async (productIds) => {
         try {
-            const response = await axios.post(`${apiUrl}/product/compare`, { productIds });
+            console.log('Gửi request so sánh với productIds:', productIds);
+
+            // Đảm bảo productIds luôn là một mảng
+            const idsToSend = Array.isArray(productIds) ? productIds : [productIds];
+
+            // Gọi API lấy thông tin cơ bản của sản phẩm
+            const response = await axios.post(`${apiUrl}/product/compare`, { productIds: idsToSend });
+
+            // Nếu có dữ liệu trả về, lấy thêm thông tin chi tiết cho từng sản phẩm
+            if (response.data.success && response.data.data) {
+                const products = response.data.data;
+
+                // Lấy chi tiết cho từng sản phẩm
+                const productsWithDetails = await Promise.all(
+                    products.map(async (product) => {
+                        try {
+                            const detailResponse = await axios.get(`${apiUrl}/product-detail/${product._id}`);
+                            if (detailResponse.data && detailResponse.data.data) {
+                                return {
+                                    ...product,
+                                    details: detailResponse.data.data
+                                };
+                            }
+                            return product;
+                        } catch (error) {
+                            console.error(`Lỗi khi lấy chi tiết cho sản phẩm ${product._id}:`, error);
+                            return product;
+                        }
+                    })
+                );
+
+                // Trả về kết quả với chi tiết
+                return {
+                    ...response.data,
+                    data: productsWithDetails
+                };
+            }
+
             return response.data;
         } catch (error) {
             console.error('Lỗi khi so sánh sản phẩm:', error);

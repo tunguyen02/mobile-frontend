@@ -191,63 +191,32 @@ const ProductDetail = () => {
     };
 
     const handleAddToCompare = () => {
-        // Kiểm tra localStorage để lấy danh sách sản phẩm so sánh hiện tại
-        let compareList = localStorage.getItem('compareProducts');
-        let productIds = [];
-
-        if (compareList) {
-            productIds = JSON.parse(compareList);
-        }
-
-        // Lấy giá hiện tại của sản phẩm (giá sale nếu có)
+        // Lưu giá hiện tại của sản phẩm (giá sale nếu có)
         const productPrice = currentPrice;
 
-        // Thêm thông tin về flash sale
-        let saleParams = '';
+        // Xây dựng URL cho trang so sánh với sản phẩm hiện tại là sản phẩm cố định
+        let compareUrl = `/product/compare?fixedId=${productId}`;
+
+        // Thêm thông tin giá
+        if (productPrice) {
+            compareUrl += `&price=${productPrice}`;
+        }
 
         // Nếu sản phẩm đang giảm giá, thêm thông tin giảm giá
         if (savingPercentage > 0) {
-            saleParams = `&discount=${savingPercentage}`;
+            compareUrl += `&discount=${savingPercentage}`;
 
             // Nếu đang trong flash sale, thêm thông tin flash sale
             if (flashSaleInfo && isFlashSaleActive()) {
-                saleParams += '&isFlashSale=true';
-                // Thêm thông tin giá gốc
+                compareUrl += '&isFlashSale=true';
                 if (product?.originalPrice) {
-                    saleParams += `&originalPrice=${product.originalPrice}`;
+                    compareUrl += `&originalPrice=${product.originalPrice}`;
                 }
             }
         }
 
-        console.log("Thông tin sản phẩm so sánh:", {
-            productId,
-            price: productPrice,
-            discount: savingPercentage,
-            isFlashSale: flashSaleInfo && isFlashSaleActive(),
-            originalPrice: product?.originalPrice,
-            url: `/product/compare?ids=${productIds.join(',')}&price=${productPrice}${saleParams}`
-        });
-
-        // Kiểm tra sản phẩm đã có trong danh sách so sánh chưa
-        if (productIds.includes(productId)) {
-            // Nếu sản phẩm đã có trong danh sách, chuyển đến trang so sánh với giá của sản phẩm hiện tại
-            navigate(`/product/compare?ids=${productIds.join(',')}&price=${productPrice}${saleParams}`);
-            return;
-        }
-
-        // Thêm sản phẩm vào đầu danh sách so sánh để đảm bảo nó là sản phẩm đầu tiên
-        productIds.unshift(productId);
-
-        // Giới hạn số lượng sản phẩm so sánh (tối đa 4)
-        if (productIds.length > 4) {
-            productIds = productIds.slice(0, 4);
-        }
-
-        // Lưu danh sách mới vào localStorage
-        localStorage.setItem('compareProducts', JSON.stringify(productIds));
-
-        // Chuyển đến trang so sánh với giá của sản phẩm hiện tại
-        navigate(`/product/compare?ids=${productIds.join(',')}&price=${productPrice}${saleParams}`);
+        // Chuyển hướng đến trang so sánh
+        navigate(compareUrl);
     };
 
     if (isPending) {
