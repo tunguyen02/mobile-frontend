@@ -13,7 +13,6 @@ import Loading from "../../components/Loading/Loading";
 import productService from "../../services/productService";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils/utils";
-import { testBrandAPI } from "../../services/apiTest";
 
 function ProductListPage() {
     const navigate = useNavigate();
@@ -59,17 +58,6 @@ function ProductListPage() {
         console.log("Brands isPending:", isBrandsPending);
     }, [brands, isBrandsPending]);
 
-    // Test the API directly
-    useEffect(() => {
-        console.log("Testing API directly...");
-        testBrandAPI()
-            .then(data => {
-                console.log("Direct API test successful:", data);
-            })
-            .catch(error => {
-                console.error("Direct API test failed:", error);
-            });
-    }, []);
 
     // Query products với các filter đã APPLY (không phải filters state)
     const { data = [], isPending: isProductsPending } = useQuery({
