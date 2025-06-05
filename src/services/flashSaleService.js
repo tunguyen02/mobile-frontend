@@ -1,10 +1,11 @@
 import axios from "axios";
 import axiosJWT from "./axiosJWT";
+const apiUrl = import.meta.env.VITE_API_URL;
 
 const flashSaleService = {
     getAllFlashSales: async () => {
         try {
-            const response = await axios.get('/api/flash-sale');
+            const response = await axios.get(`${apiUrl}/flash-sale`);
             return response.data;
         } catch (error) {
             console.error('Error fetching flash sales:', error);
@@ -15,7 +16,7 @@ const flashSaleService = {
     getActiveFlashSales: async () => {
         try {
             console.log('Calling getActiveFlashSales API...');
-            const response = await axios.get('/api/flash-sale/active');
+            const response = await axios.get(`${apiUrl}/flash-sale/active`);
             console.log('getActiveFlashSales response:', response);
             return response.data;
         } catch (error) {
@@ -30,7 +31,7 @@ const flashSaleService = {
 
     getFlashSaleById: async (id) => {
         try {
-            const response = await axios.get(`/api/flash-sale/${id}`);
+            const response = await axios.get(`${apiUrl}/flash-sale/${id}`);
             return response.data;
         } catch (error) {
             console.error(`Error fetching flash sale with id ${id}:`, error);
@@ -40,7 +41,7 @@ const flashSaleService = {
 
     createFlashSale: async (data, accessToken) => {
         try {
-            const response = await axiosJWT.post('/api/flash-sale/create', data, {
+            const response = await axiosJWT.post(`${apiUrl}/flash-sale/create`, data, {
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                 }
@@ -54,7 +55,7 @@ const flashSaleService = {
 
     updateFlashSale: async (id, data, accessToken) => {
         try {
-            const response = await axiosJWT.put(`/api/flash-sale/update/${id}`, data, {
+            const response = await axiosJWT.put(`${apiUrl}/flash-sale/update/${id}`, data, {
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                 }
@@ -68,7 +69,7 @@ const flashSaleService = {
 
     deleteFlashSale: async (id, accessToken) => {
         try {
-            const response = await axiosJWT.delete(`/api/flash-sale/delete/${id}`, {
+            const response = await axiosJWT.delete(`${apiUrl}/flash-sale/delete/${id}`, {
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                 }
