@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, SearchOutlined, FilterOutlined, EyeOutlined } from "@ant-design/icons";
 import {
     Button,
     Popconfirm,
@@ -14,7 +14,9 @@ import {
     Input,
     Space,
     Tooltip,
-    Descriptions
+    Descriptions,
+    List,
+    Avatar
 } from "antd";
 import { useState } from "react";
 import orderService from "../../services/orderService";
@@ -24,6 +26,7 @@ import { handleGetAccessToken } from "../../services/axiosJWT";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import axios from "axios";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -35,10 +38,15 @@ const Orders = () => {
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [currentOrder, setCurrentOrder] = useState(null);
+    const [orderDetail, setOrderDetail] = useState(null);
     const [form] = Form.useForm();
     const [orderToDelete, setOrderToDelete] = useState(null);
     const [searchText, setSearchText] = useState('');
+    const [shippingStatusFilter, setShippingStatusFilter] = useState('');
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
 
     const { data: ordersData, isPending: isPendingGetAll } = useQuery({
         queryKey: ["orders", "admin"],
@@ -100,6 +108,21 @@ const Orders = () => {
         setIsModalOpen(true);
     };
 
+    const handleViewOrderDetail = async (record) => {
+        try {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL}/order/public/${record.order._id}`);
+            if (response.data && response.data.status === 'OK') {
+                setOrderDetail(response.data);
+                setIsDetailModalOpen(true);
+            } else {
+                message.error("Không thể lấy thông tin chi tiết đơn hàng");
+            }
+        } catch (error) {
+            console.error("Error fetching order details:", error);
+            message.error("Không thể lấy thông tin chi tiết đơn hàng");
+        }
+    };
+
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
@@ -122,13 +145,29 @@ const Orders = () => {
         setSearchText(value);
     };
 
+    const handleClearFilters = () => {
+        setShippingStatusFilter('');
+        setPaymentStatusFilter('');
+        setPaymentMethodFilter('');
+    };
+
     const filteredOrders = ordersData?.data?.filter(
         (order) => {
             const name = order.order?.shippingInfo?.name || '';
             const email = order.order?.userId?.email || '';
+            const shippingStatus = order.order?.shippingStatus || '';
+            const paymentStatus = order.payment?.paymentStatus || '';
+            const paymentMethod = order.payment?.paymentMethod || '';
+
             const searchValue = searchText.toLowerCase();
-            return name.toLowerCase().includes(searchValue) ||
+            const nameEmailMatch = name.toLowerCase().includes(searchValue) ||
                 email.toLowerCase().includes(searchValue);
+
+            const shippingStatusMatch = !shippingStatusFilter || shippingStatus === shippingStatusFilter;
+            const paymentStatusMatch = !paymentStatusFilter || paymentStatus === paymentStatusFilter;
+            const paymentMethodMatch = !paymentMethodFilter || paymentMethod === paymentMethodFilter;
+
+            return nameEmailMatch && shippingStatusMatch && paymentStatusMatch && paymentMethodMatch;
         }
     ) || [];
 
@@ -250,9 +289,18 @@ const Orders = () => {
             title: "Hành động",
             key: "action",
             align: "center",
-            width: 100,
+            width: 150,
             render: (_, record) => (
                 <Space size="small">
+                    <Tooltip title="Xem chi tiết">
+                        <Button
+                            type="primary"
+                            onClick={() => handleViewOrderDetail(record)}
+                            icon={<EyeOutlined />}
+                            shape="circle"
+                            className="bg-green-500 hover:bg-green-600"
+                        />
+                    </Tooltip>
                     <Tooltip title="Chỉnh sửa">
                         <Button
                             type="primary"
@@ -294,6 +342,67 @@ const Orders = () => {
                         style={{ width: 250 }}
                     />
                 </div>
+            </div>
+
+            <div className="mb-4 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <Text strong>Trạng thái vận chuyển:</Text>
+                    <Select
+                        placeholder="Tất cả"
+                        style={{ width: 150 }}
+                        value={shippingStatusFilter || undefined}
+                        onChange={(value) => setShippingStatusFilter(value)}
+                        allowClear
+                    >
+                        <Select.Option value="Pending">Chờ xử lý</Select.Option>
+                        <Select.Option value="Processing">Đang xử lý</Select.Option>
+                        <Select.Option value="Shipping">Đang giao</Select.Option>
+                        <Select.Option value="Completed">Hoàn thành</Select.Option>
+                        <Select.Option value="Cancelled">Đã hủy</Select.Option>
+                    </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <Text strong>Trạng thái thanh toán:</Text>
+                    <Select
+                        placeholder="Tất cả"
+                        style={{ width: 180 }}
+                        value={paymentStatusFilter || undefined}
+                        onChange={(value) => setPaymentStatusFilter(value)}
+                        allowClear
+                    >
+                        <Select.Option value="Pending">Chưa thanh toán</Select.Option>
+                        <Select.Option value="Completed">Đã thanh toán</Select.Option>
+                        <Select.Option value="Expired">Hết hạn thanh toán</Select.Option>
+                        <Select.Option value="Refund_Pending">Đang chờ hoàn tiền</Select.Option>
+                        <Select.Option value="Refunded">Đã hoàn tiền</Select.Option>
+                        <Select.Option value="Refund_Failed">Hoàn tiền thất bại</Select.Option>
+                    </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <Text strong>Phương thức thanh toán:</Text>
+                    <Select
+                        placeholder="Tất cả"
+                        style={{ width: 120 }}
+                        value={paymentMethodFilter || undefined}
+                        onChange={(value) => setPaymentMethodFilter(value)}
+                        allowClear
+                    >
+                        <Select.Option value="COD">COD</Select.Option>
+                        <Select.Option value="VNPay">VNPay</Select.Option>
+                    </Select>
+                </div>
+
+                {(shippingStatusFilter || paymentStatusFilter || paymentMethodFilter) && (
+                    <Button
+                        type="link"
+                        onClick={handleClearFilters}
+                        className="text-blue-500"
+                    >
+                        Xóa bộ lọc
+                    </Button>
+                )}
             </div>
 
             <Divider className="my-4" />
@@ -381,6 +490,154 @@ const Orders = () => {
                 centered
             >
                 <p>Bạn có chắc muốn xóa đơn hàng này không?</p>
+            </Modal>
+
+            {/* Modal for order details */}
+            <Modal
+                title={<Text strong>Chi tiết đơn hàng</Text>}
+                open={isDetailModalOpen}
+                onCancel={() => setIsDetailModalOpen(false)}
+                footer={[
+                    <Button key="back" onClick={() => setIsDetailModalOpen(false)}>
+                        Đóng
+                    </Button>
+                ]}
+                width={800}
+                centered
+            >
+                {orderDetail && orderDetail.data && (
+                    <div className="space-y-6">
+                        <Descriptions title="Thông tin đơn hàng" bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}>
+                            <Descriptions.Item label="Mã đơn hàng">{orderDetail.data.order._id}</Descriptions.Item>
+                            <Descriptions.Item label="Ngày đặt hàng">
+                                {dayjs(orderDetail.data.order.createdAt).tz("Asia/Ho_Chi_Minh").format("DD/MM/YYYY HH:mm")}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Trạng thái vận chuyển">
+                                <Tag color={
+                                    orderDetail.data.order.shippingStatus === "Pending" ? "orange" :
+                                        orderDetail.data.order.shippingStatus === "Processing" ? "purple" :
+                                            orderDetail.data.order.shippingStatus === "Shipping" ? "blue" :
+                                                orderDetail.data.order.shippingStatus === "Completed" ? "green" :
+                                                    orderDetail.data.order.shippingStatus === "Cancelled" ? "red" : "default"
+                                }>
+                                    {orderDetail.data.order.shippingStatus === "Pending" ? "Chờ xử lý" :
+                                        orderDetail.data.order.shippingStatus === "Processing" ? "Đang xử lý" :
+                                            orderDetail.data.order.shippingStatus === "Shipping" ? "Đang giao" :
+                                                orderDetail.data.order.shippingStatus === "Completed" ? "Hoàn thành" :
+                                                    orderDetail.data.order.shippingStatus === "Cancelled" ? "Đã hủy" : "Không xác định"}
+                                </Tag>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Trạng thái thanh toán">
+                                <Tag color={
+                                    orderDetail.data.payment?.paymentStatus === "Pending" ? "orange" :
+                                        orderDetail.data.payment?.paymentStatus === "Completed" ? "green" :
+                                            orderDetail.data.payment?.paymentStatus === "Expired" ? "red" :
+                                                orderDetail.data.payment?.paymentStatus === "Refund_Pending" ? "blue" :
+                                                    orderDetail.data.payment?.paymentStatus === "Refunded" ? "cyan" :
+                                                        orderDetail.data.payment?.paymentStatus === "Refund_Failed" ? "red" : "default"
+                                }>
+                                    {orderDetail.data.payment?.paymentStatus === "Pending" ? "Chưa thanh toán" :
+                                        orderDetail.data.payment?.paymentStatus === "Completed" ? "Đã thanh toán" :
+                                            orderDetail.data.payment?.paymentStatus === "Expired" ? "Hết hạn thanh toán" :
+                                                orderDetail.data.payment?.paymentStatus === "Refund_Pending" ? "Đang chờ hoàn tiền" :
+                                                    orderDetail.data.payment?.paymentStatus === "Refunded" ? "Đã hoàn tiền" :
+                                                        orderDetail.data.payment?.paymentStatus === "Refund_Failed" ? "Hoàn tiền thất bại" : "Không xác định"}
+                                </Tag>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Phương thức thanh toán">{orderDetail.data.payment?.paymentMethod}</Descriptions.Item>
+                            <Descriptions.Item label="Tổng tiền">
+                                <Text className="text-red-600 font-bold">
+                                    {new Intl.NumberFormat("vi-VN", {
+                                        style: "currency",
+                                        currency: "VND",
+                                    }).format(orderDetail.data.order.totalPrice)}
+                                </Text>
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        <Divider />
+
+                        <Descriptions title="Thông tin người nhận" bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}>
+                            <Descriptions.Item label="Họ tên">{orderDetail.data.order.shippingInfo.name}</Descriptions.Item>
+                            <Descriptions.Item label="Số điện thoại">{orderDetail.data.order.shippingInfo.phoneNumber}</Descriptions.Item>
+                            <Descriptions.Item label="Địa chỉ" span={2}>
+                                {orderDetail.data.order.shippingInfo.detailedAddress &&
+                                    `${orderDetail.data.order.shippingInfo.detailedAddress}, ${orderDetail.data.order.shippingInfo.ward}, ${orderDetail.data.order.shippingInfo.district}, ${orderDetail.data.order.shippingInfo.city}`}
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        <Divider />
+
+                        <div>
+                            <Title level={5}>Danh sách sản phẩm</Title>
+                            <List
+                                itemLayout="horizontal"
+                                dataSource={orderDetail.data.order.products}
+                                renderItem={(item) => (
+                                    <List.Item>
+                                        <List.Item.Meta
+                                            avatar={
+                                                <Avatar shape="square" size={64} src={item.product.imageUrl?.[0]} />
+                                            }
+                                            title={<Text strong>{item.product.name}</Text>}
+                                            description={
+                                                <Space direction="vertical">
+                                                    <Text>Số lượng: {item.quantity}</Text>
+                                                    <Text>Đơn giá: {new Intl.NumberFormat("vi-VN", {
+                                                        style: "currency",
+                                                        currency: "VND",
+                                                    }).format(item.price)}</Text>
+                                                    {item.isFlashSale && (
+                                                        <Tag color="volcano">Flash Sale</Tag>
+                                                    )}
+                                                </Space>
+                                            }
+                                        />
+                                        <div className="text-right">
+                                            <Text className="text-red-500 font-bold">
+                                                {new Intl.NumberFormat("vi-VN", {
+                                                    style: "currency",
+                                                    currency: "VND",
+                                                }).format(item.price * item.quantity)}
+                                            </Text>
+                                        </div>
+                                    </List.Item>
+                                )}
+                            />
+
+                            <div className="mt-4 bg-gray-50 p-4 rounded-md">
+                                <div className="flex justify-between items-center">
+                                    <Text>Tạm tính:</Text>
+                                    <Text>
+                                        {new Intl.NumberFormat("vi-VN", {
+                                            style: "currency",
+                                            currency: "VND",
+                                        }).format(orderDetail.data.order.subTotal)}
+                                    </Text>
+                                </div>
+                                <div className="flex justify-between items-center mt-2">
+                                    <Text>Phí vận chuyển:</Text>
+                                    <Text>
+                                        {new Intl.NumberFormat("vi-VN", {
+                                            style: "currency",
+                                            currency: "VND",
+                                        }).format(orderDetail.data.order.shippingPrice)}
+                                    </Text>
+                                </div>
+                                <Divider className="my-2" />
+                                <div className="flex justify-between items-center">
+                                    <Text strong>Tổng cộng:</Text>
+                                    <Text className="text-red-600 font-bold text-lg">
+                                        {new Intl.NumberFormat("vi-VN", {
+                                            style: "currency",
+                                            currency: "VND",
+                                        }).format(orderDetail.data.order.totalPrice)}
+                                    </Text>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </Card>
     );

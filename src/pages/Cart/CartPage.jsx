@@ -27,7 +27,6 @@ import { useNavigate } from "react-router-dom";
 import { isFlashSaleValid, updateFlashSaleSoldCount } from "../../utils/utils";
 const { Title, Text } = Typography;
 
-// Định nghĩa phí vận chuyển cố định
 const SHIPPING_FEE = 30000;
 
 const CartPage = () => {
@@ -38,7 +37,6 @@ const CartPage = () => {
     const [flashSaleProducts, setFlashSaleProducts] = useState({});
     const [isRedirecting, setIsRedirecting] = useState(false);
 
-    // Kiểm tra các sản phẩm Flash Sale từ localStorage
     useEffect(() => {
         const flashSaleItems = {};
 
@@ -47,16 +45,13 @@ const CartPage = () => {
                 const productId = item?.product?._id;
                 if (productId) {
                     try {
-                        // Lấy thông tin Flash Sale từ localStorage
                         const flashSaleData = localStorage.getItem(`flashSale_${productId}`);
                         if (flashSaleData) {
                             const parsedData = JSON.parse(flashSaleData);
 
-                            // Sử dụng hàm tiện ích để kiểm tra tính hợp lệ của Flash Sale
                             if (isFlashSaleValid(parsedData)) {
                                 flashSaleItems[productId] = parsedData;
                             } else {
-                                // Xóa Flash Sale hết hạn hoặc hết số lượng
                                 localStorage.removeItem(`flashSale_${productId}`);
                             }
                         }
@@ -70,7 +65,6 @@ const CartPage = () => {
         setFlashSaleProducts(flashSaleItems);
     }, [cart]);
 
-    // Cập nhật giỏ hàng với thông tin giá Flash Sale
     useEffect(() => {
         if (Object.keys(flashSaleProducts).length > 0 && cart?.products?.length > 0) {
             let needsUpdate = false;
@@ -78,7 +72,6 @@ const CartPage = () => {
                 const productId = item?.product?._id;
                 if (productId && flashSaleProducts[productId]) {
                     needsUpdate = true;
-                    // Không thay đổi giá gốc, chỉ đánh dấu sản phẩm là Flash Sale
                     const product = {
                         ...item.product,
                         isFlashSale: true,
@@ -94,18 +87,14 @@ const CartPage = () => {
             });
 
             if (needsUpdate) {
-                // Tính lại tổng giá với giá Flash Sale
                 const totalPrice = updatedProducts.reduce((total, item) => {
                     const productId = item?.product?._id;
                     if (productId && flashSaleProducts[productId]) {
-                        // Sử dụng giá Flash Sale cho tính tổng
                         return total + (flashSaleProducts[productId].discountPrice * item.quantity);
                     }
-                    // Sử dụng giá thường
                     return total + (item.product.price * item.quantity);
                 }, 0);
 
-                // Cập nhật giỏ hàng trong Redux
                 const updatedCart = {
                     ...cart,
                     products: updatedProducts,
@@ -117,7 +106,7 @@ const CartPage = () => {
         }
     }, [flashSaleProducts, dispatch]);
 
-    const formRef = useRef(null); // Ref để truy cập Form
+    const formRef = useRef(null);
     useEffect(() => {
         if (formRef.current && user) {
             formRef.current.setFieldsValue({
@@ -132,7 +121,6 @@ const CartPage = () => {
         }
     }, [user]);
 
-    //Mutation sửa đổi sản phẩm trong đơn hàng
     const updateProductMutation = useMutation({
         mutationFn: async ({ productId, quantity }) => {
             const accessToken = handleGetAccessToken();
@@ -185,54 +173,44 @@ const CartPage = () => {
     };
 
     const handleQuantityChange = (id, value) => {
-        // Lấy số lượng hiện tại của sản phẩm trong giỏ hàng
+
         const currentItem = cart?.products?.find(item => item.product?._id === id);
         if (!currentItem) return;
 
-        // Tính số lượng thay đổi
         const currentQuantity = currentItem.quantity;
         const quantityChange = value - currentQuantity;
 
-        // Nếu có tăng số lượng và là sản phẩm Flash Sale, cập nhật soldCount
         if (quantityChange > 0 && flashSaleProducts[id]) {
-            // Kiểm tra nếu còn đủ số lượng cho Flash Sale
             const flashSaleData = JSON.parse(localStorage.getItem(`flashSale_${id}`));
             if (flashSaleData) {
                 const soldCount = flashSaleData.soldCount || 0;
                 const availableQuantity = flashSaleData.quantity || 0;
                 const remainingQuantity = availableQuantity - soldCount;
 
-                // Nếu số lượng mới vượt quá số lượng còn lại của Flash Sale
                 if (soldCount + quantityChange > availableQuantity) {
                     if (remainingQuantity <= 0) {
                         message.warning(`Sản phẩm đã hết số lượng Flash Sale. Nếu bạn tiếp tục mua, sẽ được tính theo giá thông thường.`, 5);
-                        // Xóa Flash Sale khỏi localStorage
                         localStorage.removeItem(`flashSale_${id}`);
-                        // Cập nhật lại state flashSaleProducts
                         setFlashSaleProducts(prev => {
                             const updated = { ...prev };
                             delete updated[id];
                             return updated;
                         });
-                        // Cập nhật số lượng theo yêu cầu
                         updateProductMutation.mutate({ productId: id.toString(), quantity: value });
                         return;
                     } else {
                         message.warning(`Chỉ còn ${remainingQuantity} sản phẩm với giá Flash Sale. Số lượng đã được điều chỉnh.`, 5);
 
-                        // Cập nhật số lượng tối đa có thể mua với giá Flash Sale
                         const maxQuantity = remainingQuantity + currentQuantity;
                         updateProductMutation.mutate({ productId: id.toString(), quantity: maxQuantity });
                         return;
                     }
                 }
 
-                // Cập nhật soldCount trong localStorage
                 updateFlashSaleSoldCount(id, quantityChange);
             }
         }
 
-        // Thực hiện cập nhật giỏ hàng
         updateProductMutation.mutate({ productId: id.toString(), quantity: value });
     };
 
@@ -243,7 +221,6 @@ const CartPage = () => {
     //Create order
     const createOrderMutation = useMutation({
         mutationFn: async ({ shippingInfo, paymentMethod, cartWithFlashSale }) => {
-            // For VNPay payments, show loading state immediately
             if (paymentMethod === "VNPay") {
                 setIsRedirecting(true);
             }
@@ -251,17 +228,13 @@ const CartPage = () => {
             return orderService.createOrder(accessToken, shippingInfo, paymentMethod, cartWithFlashSale);
         },
         onSuccess: (data) => {
-            // Chỉ hiển thị thông báo thành công nếu là COD
             if (data.paymentMethod === "COD") {
                 message.success(data?.message, 3);
-                // For COD, clear cart immediately
                 dispatch(resetCart());
             } else if (data.paymentMethod === "VNPay") {
-                // For VNPay, we've already set isRedirecting to true in mutationFn
                 message.loading("Đang chuyển hướng đến cổng thanh toán VNPay...", 2);
             }
 
-            // Cập nhật số lượng Flash Sale đã bán trong localStorage
             try {
                 if (cart?.products && Object.keys(flashSaleProducts).length > 0) {
                     cart.products.forEach(item => {
@@ -269,14 +242,11 @@ const CartPage = () => {
                         if (productId && flashSaleProducts[productId]) {
                             const flashSaleData = JSON.parse(localStorage.getItem(`flashSale_${productId}`));
                             if (flashSaleData) {
-                                // Cập nhật soldCount
                                 const newSoldCount = (flashSaleData.soldCount || 0) + item.quantity;
                                 flashSaleData.soldCount = newSoldCount;
 
-                                // Lưu lại vào localStorage
                                 localStorage.setItem(`flashSale_${productId}`, JSON.stringify(flashSaleData));
 
-                                // Nếu đã bán hết, xóa khỏi localStorage
                                 if (newSoldCount >= flashSaleData.quantity) {
                                     localStorage.removeItem(`flashSale_${productId}`);
                                 }
@@ -289,15 +259,11 @@ const CartPage = () => {
             }
 
             if (data.paymentUrl) {
-                // Đối với VNPay, chuyển hướng đến trang thanh toán
-                // Đặt một timeout lớn hơn để hiển thị modal loading lâu hơn
                 setTimeout(() => {
-                    // Reset cart right before redirecting to VNPay
                     dispatch(resetCart());
                     window.location.href = data.paymentUrl;
                 }, 2000);
             } else {
-                // Đối với COD, chuyển hướng đến trang chi tiết đơn hàng thay vì trang thành công
                 dispatch(resetCart());
                 navigate(`/order/details/${data?.newOrder?._id}`);
             }
@@ -328,16 +294,11 @@ const CartPage = () => {
             detailedAddress,
         };
 
-        // Sao chép giỏ hàng để backend xử lý đúng các giá Flash Sale
         const cartWithFlashSale = {
             ...cart,
             flashSaleProducts: flashSaleProducts,
             shippingFee: SHIPPING_FEE
         };
-
-        // Log để kiểm tra dữ liệu Flash Sale trước khi gửi
-        console.log("Flash Sale Products being sent:", flashSaleProducts);
-        console.log("Cart with Flash Sale:", cartWithFlashSale);
 
         await createOrderMutation.mutateAsync({
             shippingInfo,
@@ -352,10 +313,8 @@ const CartPage = () => {
             cart.products.forEach(item => {
                 const productId = item?.product?._id;
                 if (productId && flashSaleProducts[productId]) {
-                    // Giá thông thường từ API
                     const originalPrice = item.product.price;
 
-                    // Giá Flash Sale từ localStorage
                     const flashSalePrice = flashSaleProducts[productId].discountPrice;
 
                     if (originalPrice > flashSalePrice) {
@@ -373,7 +332,6 @@ const CartPage = () => {
             spinning={updateProductMutation?.isPendingUpdate || createOrderMutation?.isPending}
             tip={createOrderMutation?.isPending ? "Đang xử lý đơn hàng..." : "Đang cập nhật..."}
         >
-            {/* Hiển thị modal chuyển hướng nếu đang chuyển hướng đến VNPay */}
             <Modal
                 open={isRedirecting}
                 closable={false}
@@ -392,28 +350,22 @@ const CartPage = () => {
 
             <div className="min-h-screen bg-gray-100 p-8">
                 <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg">
-                    {/* Tiêu đề */}
                     <Title level={3} className="mb-4">
                         Giỏ hàng của bạn
                     </Title>
 
-                    {/* Danh sách sản phẩm */}
                     <List
                         dataSource={cart?.products}
                         renderItem={(item) => {
                             const productId = item?.product?._id;
                             const isFlashSale = !!flashSaleProducts[productId];
 
-                            // Lấy thông tin Flash Sale nếu có
                             const flashSaleInfo = isFlashSale ? flashSaleProducts[productId] : null;
 
-                            // Lấy giá gốc từ sản phẩm
                             const originalPrice = item?.product?.price || 0;
 
-                            // Lấy giá Flash Sale nếu có
                             const flashSalePrice = isFlashSale ? flashSaleInfo.discountPrice : originalPrice;
 
-                            // Tính phần trăm giảm giá nếu có Flash Sale
                             const discount = isFlashSale ? Math.round((1 - flashSalePrice / originalPrice) * 100) : 0;
 
                             return (
@@ -550,7 +502,6 @@ const CartPage = () => {
                     {/* Kiểm tra giỏ hàng trống */}
                     {cart?.products?.length > 0 && (
                         <>
-                            {/* Form chọn địa chỉ */}
                             <Form
                                 layout="vertical"
                                 className="mt-6"

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import logo from '../../assets/logo-topzone-1.png';
+import logo from '../../assets/logo.jpg';
 
 const Footer = () => {
     return (
@@ -7,10 +7,10 @@ const Footer = () => {
             <div className="container mx-auto flex flex-col md:flex-row justify-between items-start px-6">
                 <div className="mb-6 md:mb-0 text-center md:text-left flex flex-col items-center md:items-start">
                     <Link to='/'>
-                        <img src={logo} alt="TopZone Logo" className="w-32 mb-4" />
+                        <img src={logo} alt="Tech Planet Logo" className="w-32 mb-4" />
                     </Link>
                     <p className="text-gray-300">
-                        TopZone - Sản phẩm điện tử uy tín, chất lượng.
+                        Tech Planet - Sản phẩm điện tử uy tín, chất lượng.
                     </p>
                 </div>
 
@@ -58,7 +58,7 @@ const Footer = () => {
             </div>
 
             <div className="text-center mt-6 text-gray-400">
-                &copy; 2025 TuNguyen. Tất cả quyền được bảo lưu.
+                &copy; 2025 Tu Nguyen. Tất cả quyền được bảo lưu.
             </div>
         </footer>
     );

@@ -94,7 +94,6 @@ const FlashSales = () => {
         if (record) {
             try {
                 const productList = record.products.map(item => {
-                    // Kiểm tra nếu item.product là object (đã được populate) hoặc chỉ là id
                     const productId = typeof item.product === 'object' ? item.product._id : item.product;
                     const productPrice = typeof item.product === 'object' ? item.product.price : 0;
 
@@ -110,7 +109,6 @@ const FlashSales = () => {
                 });
                 setSelectedProducts(productList);
 
-                // Sử dụng dayjs thay vì moment cho antd 5, hoặc giữ moment nếu dùng antd 4
                 const startMoment = dayjs ? dayjs(record.startTime) : moment(record.startTime);
                 const endMoment = dayjs ? dayjs(record.endTime) : moment(record.endTime);
 
@@ -216,17 +214,13 @@ const FlashSales = () => {
         const updatedProducts = [...selectedProducts];
         updatedProducts[index][field] = value;
 
-        // Nếu đổi sản phẩm, cập nhật giá gốc từ sản phẩm
         if (field === 'productId') {
             const selectedProduct = products.find(p => p._id === value);
             if (selectedProduct) {
                 updatedProducts[index].originalPrice = selectedProduct.price;
 
-                // Nếu đang chỉnh sửa một flashsale hiện có, đảm bảo các trường khác được tính lại
                 if (editingFlashSale) {
-                    // Đặt lại soldCount cho sản phẩm mới
                     updatedProducts[index].soldCount = 0;
-                    // Cập nhật số lượng còn lại bằng số lượng
                     updatedProducts[index].remainingQuantity = updatedProducts[index].quantity;
                 }
             }

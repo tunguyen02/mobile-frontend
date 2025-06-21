@@ -53,6 +53,7 @@ const ProductDetail = () => {
         },
         onError: (error) => {
             message.error("Thêm sản phẩm thất bại", 3);
+            navigate('/sign-in');
         }
     });
 

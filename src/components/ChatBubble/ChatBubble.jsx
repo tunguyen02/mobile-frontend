@@ -98,12 +98,9 @@ const ChatBubble = () => {
         }
     }, [isChatOpen, user._id]);
 
-    // Thêm effect mới để cuộn xuống khi mở chat
     useEffect(() => {
         if (isChatOpen && messages.length > 0) {
-            // Đợi một chút để UI render xong trước khi cuộn
             setTimeout(() => {
-                // Hard scroll to bottom để đảm bảo luôn cuộn xuống
                 if (messagesEndRef.current) {
                     const chatContainer = messagesEndRef.current.parentElement?.parentElement;
                     if (chatContainer) {
@@ -134,10 +131,8 @@ const ChatBubble = () => {
             console.log('Messages fetched:', response.data);
             dispatch(setMessages(response.data?.messages || []));
 
-            // Mark messages as read when opening the chat
             if (response.data?.messages?.length) {
                 markAsRead();
-                // Đảm bảo cuộn xuống sau khi fetch messages
                 setTimeout(scrollToBottom, 100);
             }
         } catch (error) {
@@ -180,7 +175,6 @@ const ChatBubble = () => {
     };
 
     const handleNewMessage = (data) => {
-        // Kiểm tra xem data có hợp lệ không
         if (!data || !data.messages || !data.messages.length) {
             console.warn('Invalid message data received:', data);
             return;

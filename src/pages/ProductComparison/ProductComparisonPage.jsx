@@ -89,14 +89,11 @@ const ProductComparisonPage = () => {
         { label: 'Dung lượng', value: 'storage' }
     ];
 
-    // Mutation cho việc thêm vào giỏ hàng
     const mutationAddToCart = useMutation({
         mutationFn: (product) => {
             const accessToken = handleGetAccessToken();
-            // Xác định giá hiện tại dựa trên flash sale hoặc sale thường
             const isOnSale = product.isFlashSale || product.isOnSale;
 
-            // Nếu sản phẩm đang trong flash sale
             if (product.isFlashSale) {
                 return cartService.addFlashSaleProductToCart(
                     accessToken,
@@ -105,7 +102,6 @@ const ProductComparisonPage = () => {
                     product.isFlashSale ? product.price : product.originalPrice
                 );
             }
-            // Ngược lại thêm bình thường
             return cartService.addProductToCart(accessToken, product._id);
         },
         onSuccess: (data) => {
@@ -114,25 +110,22 @@ const ProductComparisonPage = () => {
         },
         onError: (error) => {
             message.error("Thêm sản phẩm thất bại", 3);
+            navigate('/sign-in');
         }
     });
 
-    // Lấy thông tin sản phẩm từ URL params
     useEffect(() => {
         const searchParams = new URLSearchParams(location.search);
         const fixedId = searchParams.get('fixedId');
         const compareId = searchParams.get('compareId');
 
-        // Thiết lập sản phẩm cố định
         if (fixedId) {
             setFixedProductId(fixedId);
 
-            // Nếu có cả sản phẩm cố định và sản phẩm so sánh, thực hiện so sánh
             if (compareId) {
                 setCompareProductId(compareId);
                 fetchProductsForComparison([fixedId, compareId]);
             } else {
-                // Nếu chỉ có sản phẩm cố định, lấy thông tin sản phẩm đó
                 fetchSingleProduct(fixedId);
             }
         } else {
@@ -140,30 +133,24 @@ const ProductComparisonPage = () => {
             setError('Không có sản phẩm nào được chọn để so sánh');
         }
 
-        // Lấy danh sách sản phẩm có sẵn để so sánh
         fetchAvailableProducts();
     }, [location.search]);
 
-    // Hàm lấy thông tin của một sản phẩm
     const fetchSingleProduct = async (productId) => {
         try {
             setLoading(true);
-            // Lấy thông tin cơ bản của sản phẩm
             const response = await productService.getProductById(productId);
 
             if (response && response.product) {
-                // Lấy thông tin chi tiết của sản phẩm
                 try {
                     const detailResponse = await productService.getProductDetail(productId);
                     if (detailResponse && detailResponse.data) {
-                        // Kết hợp thông tin sản phẩm và chi tiết
                         const productWithDetails = {
                             ...response.product,
                             details: detailResponse.data
                         };
                         setProducts([productWithDetails]);
                     } else {
-                        // Nếu không có chi tiết, chỉ lấy thông tin cơ bản
                         setProducts([response.product]);
                     }
                 } catch (detailError) {
@@ -181,7 +168,6 @@ const ProductComparisonPage = () => {
         }
     };
 
-    // Hàm lấy danh sách sản phẩm để so sánh
     const fetchProductsForComparison = async (ids) => {
         try {
             setLoading(true);
@@ -193,7 +179,6 @@ const ProductComparisonPage = () => {
                 return;
             }
 
-            // Gọi API compareProducts để lấy thông tin sản phẩm và chi tiết đi kèm
             const response = await productService.compareProducts(ids);
 
             if (response.success && response.data) {
@@ -210,7 +195,6 @@ const ProductComparisonPage = () => {
         }
     };
 
-    // Lấy danh sách sản phẩm khác để thêm vào so sánh
     const fetchAvailableProducts = async () => {
         try {
             const response = await productService.getAllProducts();
@@ -224,7 +208,6 @@ const ProductComparisonPage = () => {
         }
     };
 
-    // Hàm thay đổi sản phẩm so sánh
     const handleCompareProductChange = (productId) => {
         if (!fixedProductId) {
             notification.error({
@@ -234,30 +217,24 @@ const ProductComparisonPage = () => {
             return;
         }
 
-        // Xây dựng lại URL với sản phẩm so sánh mới
         const currentUrl = new URL(window.location.href);
         const searchParams = new URLSearchParams(currentUrl.search);
         searchParams.set('compareId', productId);
 
-        // Giữ nguyên các tham số khác
         const newUrl = `/product/compare?${searchParams.toString()}`;
         navigate(newUrl);
     };
 
-    // Hàm thêm sản phẩm vào giỏ hàng
     const handleAddToCart = (product) => {
-        // Kiểm tra xem người dùng đã đăng nhập chưa
         if (!user) {
             setSelectedProduct(product);
             setLoginModalVisible(true);
             return;
         }
 
-        // Gọi mutation để thêm vào giỏ hàng
         mutationAddToCart.mutate(product);
     };
 
-    // Render khi đang tải
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen bg-gray-900">
@@ -266,7 +243,6 @@ const ProductComparisonPage = () => {
         );
     }
 
-    // Render khi có lỗi
     if (error) {
         return (
             <div className="container mx-auto p-4 bg-gray-900 min-h-screen">
@@ -286,7 +262,6 @@ const ProductComparisonPage = () => {
         );
     }
 
-    // Kiểm tra nếu không có sản phẩm
     if (!products || products.length === 0) {
         return (
             <div className="container mx-auto p-4 bg-gray-900 min-h-screen">
@@ -306,11 +281,9 @@ const ProductComparisonPage = () => {
         );
     }
 
-    // Xác định sản phẩm cố định và sản phẩm so sánh (nếu có)
     const fixedProduct = fixedProductId ? products.find(p => p._id === fixedProductId) : products[0];
     const compareProduct = compareProductId ? products.find(p => p._id === compareProductId) : null;
 
-    // Danh sách sản phẩm để hiển thị (1 hoặc 2 sản phẩm)
     const displayProducts = compareProduct ? [fixedProduct, compareProduct] : [fixedProduct];
 
     return (

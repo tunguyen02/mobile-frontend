@@ -2,6 +2,7 @@ import { Form, Input, Button, Spin, Row, Col, Card, Typography, Divider } from '
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import productDetailService from "../../services/productDetailService";
+import productService from "../../services/productService";
 import { ArrowLeftOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -9,25 +10,33 @@ const { Title, Text } = Typography;
 const ProductSpecifications = () => {
     const { productId } = useParams();
     const [loading, setLoading] = useState(false);
+    const [productName, setProductName] = useState('');
     const [form] = Form.useForm();
     const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchSpecifications = async () => {
+        const fetchData = async () => {
             setLoading(true);
             try {
+                // Fetch product details to get the name
+                const productData = await productService.getProductById(productId);
+                if (productData && productData.product) {
+                    setProductName(productData.product.name);
+                }
+
+                // Fetch specifications
                 const specifications = await productDetailService.getProductDetail(productId);
                 if (specifications) {
                     form.setFieldsValue(specifications.data);
                 }
             } catch (error) {
-                console.error('Error fetching product specifications:', error);
+                console.error('Error fetching product data:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchSpecifications();
+        fetchData();
     }, [productId, form]);
 
     const onFinish = async (values) => {
@@ -45,7 +54,11 @@ const ProductSpecifications = () => {
     return (
         <Card className="shadow-md">
             <div className="mb-4 flex justify-between items-center">
-                <Title level={4} className="mb-0">Thông số kỹ thuật sản phẩm</Title>
+                <div>
+                    <Title level={4} className="mb-0">
+                        Thông số kỹ thuật sản phẩm {productName && `- ${productName}`}
+                    </Title>
+                </div>
                 <Button
                     icon={<ArrowLeftOutlined />}
                     onClick={() => navigate(`/admin/products/detail/${productId}`)}

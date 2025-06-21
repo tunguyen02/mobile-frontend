@@ -1,5 +1,5 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, Popconfirm, Table, Select, Card, Typography, Space, Tooltip, Tag, Divider, Image } from "antd";
+import { Button, Popconfirm, Table, Select, Card, Typography, Space, Tooltip, Tag, Divider, Image, Input } from "antd";
 import { useEffect, useState } from "react";
 import brandService from "../../services/brandService";
 import productService from "../../services/productService";
@@ -12,6 +12,7 @@ const Products = () => {
     const [brands, setBrands] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedBrand, setSelectedBrand] = useState("Apple");
+    const [searchText, setSearchText] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -62,6 +63,14 @@ const Products = () => {
     const handleBrandChange = (value) => {
         setSelectedBrand(value);
     };
+
+    const handleSearch = (value) => {
+        setSearchText(value);
+    };
+
+    const filteredProducts = products.filter(
+        (product) => product.name.toLowerCase().includes(searchText.toLowerCase())
+    );
 
     const columns = [
         {
@@ -194,6 +203,12 @@ const Products = () => {
                     <Text type="secondary">Quản lý danh sách các sản phẩm theo thương hiệu</Text>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Input.Search
+                        placeholder="Tìm kiếm sản phẩm..."
+                        allowClear
+                        onChange={(e) => handleSearch(e.target.value)}
+                        style={{ width: 250 }}
+                    />
                     <Button
                         type="primary"
                         icon={<PlusOutlined />}
@@ -230,7 +245,7 @@ const Products = () => {
 
             <Table
                 columns={columns}
-                dataSource={products}
+                dataSource={filteredProducts}
                 loading={loading}
                 rowKey="_id"
                 pagination={{

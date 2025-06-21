@@ -29,8 +29,6 @@ const AdminChats = () => {
     const user = useSelector((state) => state.user);
     const { messages, activeChat, allChats } = useSelector((state) => state.chat);
 
-    console.log('Admin user data:', user); // Debug admin user data
-    console.log('Active chat:', activeChat); // Debug active chat
 
     useEffect(() => {
         if (user.role === 'Admin') {
@@ -75,7 +73,6 @@ const AdminChats = () => {
             setChatLoading(true);
             const response = await chatService.getMessages(userId);
 
-            // Kiểm tra xem chat vẫn còn active không (tránh update state sau khi component unmount)
             if (activeChat?.userId?._id === userId) {
                 dispatch(setMessages(response.data?.messages || []));
             }
@@ -102,38 +99,32 @@ const AdminChats = () => {
         }
 
         if (activeChat?.userId?._id === userId) {
-            // Kiểm tra xem tin nhắn đã có trong danh sách chưa
             const isDuplicate = messages.some(msg => msg._id === message._id);
 
             if (!isDuplicate) {
                 console.log('Adding new user message to chat:', message);
                 dispatch(addMessage(message));
                 markAsRead(userId);
-                // Đảm bảo cuộn xuống sau khi thêm tin nhắn mới
                 setTimeout(scrollToBottom, 100);
             } else {
                 console.log('Duplicate message detected, ignoring:', message);
             }
         } else {
             console.log('Message for non-active chat, refreshing chat list');
-            // Update chat list to show new message indicator
             fetchAllChats();
         }
     };
 
     const handleOnlineUsers = (userIds) => {
         console.log('Online users:', userIds);
-        // You could update UI to show which users are online
     };
 
     const handleUserOnline = (userId) => {
         console.log('User came online:', userId);
-        // You could update UI to show this user is now online
     };
 
     const handleUserOffline = (userId) => {
         console.log('User went offline:', userId);
-        // You could update UI to show this user is now offline
     };
 
     const handleTyping = ({ userId, isTyping }) => {
@@ -160,7 +151,6 @@ const AdminChats = () => {
                 inputRef.current.focus();
             }
 
-            // Tạo tin nhắn tạm thời cho UI
             const tempMessage = {
                 _id: `temp-${Date.now()}`,
                 sender: 'Admin',
@@ -168,17 +158,14 @@ const AdminChats = () => {
                 type: 'Text',
                 isRead: false,
                 createdAt: new Date().toISOString(),
-                tempMessage: true // Đánh dấu đây là tin nhắn tạm
+                tempMessage: true
             };
 
-            // Ngay lập tức thêm tin nhắn tạm vào UI để người dùng thấy ngay
             dispatch(addMessage(tempMessage));
             setTimeout(scrollToBottom, 10); // Giảm thời gian timeout
 
-            // Biến local để theo dõi trạng thái gửi
             let messageSent = false;
 
-            // Chuẩn bị dữ liệu tin nhắn
             const messageData = {
                 userId: activeChat.userId._id,
                 sender: 'Admin',
@@ -186,7 +173,6 @@ const AdminChats = () => {
                 type: 'Text'
             };
 
-            // Gửi tin nhắn song song qua cả socket và API để tăng tốc độ
             const socketPromise = new Promise((resolve, reject) => {
                 const messageConfirmHandler = (data) => {
                     console.log('Socket message confirmation received:', data);
@@ -204,16 +190,14 @@ const AdminChats = () => {
                 socket.once('messageSent', messageConfirmHandler);
                 socket.emit('sendMessage', messageData);
 
-                // Timeout cho socket
                 setTimeout(() => {
                     if (!messageSent) {
                         socket.off('messageSent', messageConfirmHandler);
                         reject(new Error('Socket timeout'));
                     }
-                }, 1000); // Giảm timeout xuống 1 giây
+                }, 1000);
             });
 
-            // Cố gắng gửi qua socket trước, nếu không thành công, sử dụng API
             socketPromise.catch(async (error) => {
                 console.log('Falling back to API due to:', error);
 
@@ -271,14 +255,12 @@ const AdminChats = () => {
         }
     };
 
-    // Thêm useEffect để đảm bảo cuộn xuống khi thay đổi activeChat
     useEffect(() => {
         if (activeChat) {
             setTimeout(scrollToBottom, 200);
         }
     }, [activeChat]);
 
-    // Đảm bảo cuộn xuống khi có tin nhắn mới
     useEffect(() => {
         if (messages && messages.length > 0) {
             scrollToBottom();
@@ -332,7 +314,6 @@ const AdminChats = () => {
     };
 
     const setupSocketListeners = () => {
-        // Remove any existing listeners first to prevent duplicates
         cleanupSocketListeners();
 
         // Setup new listeners
@@ -343,7 +324,6 @@ const AdminChats = () => {
         socket.on('userOffline', handleUserOffline);
         socket.on('typing', handleTyping);
 
-        // Add error listener
         socket.on('error', (error) => {
             console.error('Socket error:', error);
             message.error(`Lỗi kết nối: ${error}`);
@@ -362,7 +342,6 @@ const AdminChats = () => {
         socket.disconnect();
     };
 
-    // Only show for admins
     if (user.role !== 'Admin') {
         return (
             <Empty
@@ -376,7 +355,6 @@ const AdminChats = () => {
             <Title level={2} className="mb-4">Chăm sóc khách hàng</Title>
 
             <div className="flex gap-6 flex-1 overflow-hidden" style={{ maxHeight: "calc(100vh - 150px)" }}>
-                {/* Danh sách chat bên trái */}
                 <div className="w-[30%] min-w-[300px] flex flex-col overflow-hidden bg-white rounded-lg shadow">
                     <div className="p-3 border-b">
                         <Tabs defaultActiveKey="all" className="m-0">
@@ -435,7 +413,6 @@ const AdminChats = () => {
                     </div>
                 </div>
 
-                {/* Phần nội dung chat bên phải */}
                 <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-lg shadow">
                     {activeChat ? (
                         <>
@@ -465,7 +442,6 @@ const AdminChats = () => {
                                 </div>
                             </div>
 
-                            {/* Phần tin nhắn - chiều cao được giới hạn */}
                             <div className="flex-1 overflow-y-auto bg-gray-100 p-4">
                                 {chatLoading ? (
                                     <div className="h-full flex justify-center items-center">
@@ -488,7 +464,6 @@ const AdminChats = () => {
                                 )}
                             </div>
 
-                            {/* Footer - phần nhập tin nhắn ngắn hơn */}
                             <div className="py-2 px-4 border-t border-gray-200 bg-white">
                                 <Form form={form} onFinish={handleSendMessage} className="flex">
                                     <Form.Item name="message" className="mb-0 flex-1">

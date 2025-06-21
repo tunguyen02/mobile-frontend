@@ -4,7 +4,6 @@ import { Popover, Button, Checkbox, Divider } from 'antd';
 const BrandFilter = ({ brands = [], selectedBrands, setSelectedBrands }) => {
     const [popoverVisible, setPopoverVisible] = useState(false);
 
-    // Log để debug
     useEffect(() => {
         console.log("BrandFilter received brands:", brands);
         console.log("BrandFilter selected brands:", selectedBrands);

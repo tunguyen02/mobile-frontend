@@ -1,5 +1,5 @@
 import React from "react";
-import logo from "../../assets/logo-topzone-1.png";
+import logo from "../../assets/logo.jpg";
 import { Input } from "antd";
 const { Search } = Input;
 import { createSearchParams, useNavigate } from "react-router-dom";

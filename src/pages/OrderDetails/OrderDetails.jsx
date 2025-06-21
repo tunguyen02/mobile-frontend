@@ -260,10 +260,9 @@ function OrderDetails() {
             dataIndex: "price",
             key: "price",
             render: (text, record) => {
-                // Lấy giá gốc từ nhiều nguồn có thể 
                 const originalPrice = record.originalPrice ||
                     record.product?.originalPrice ||
-                    (record.isFlashSale ? 19990000 : record.price) || 0; // Hardcode giá iPhone để đảm bảo
+                    (record.isFlashSale ? 19990000 : record.price) || 0;
 
                 // Lấy giá hiện tại
                 const currentPrice = record.price || 0;

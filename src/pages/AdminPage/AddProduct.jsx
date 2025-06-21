@@ -56,9 +56,14 @@ const AddProduct = () => {
             }
 
             const res = await productService.createProduct(newProduct, fileList);
-            console.log("Create product:", res);
+            console.log("Create product response:", res);
             form.resetFields();
-            navigate('/admin/products');
+            if (res && res.data && res.data._id) {
+                navigate(`/admin/products/specifications/${res.data._id}`);
+            } else {
+                console.error("Không thể tìm thấy ID sản phẩm trong phản hồi:", res);
+                navigate('/admin/products');
+            }
         } catch (error) {
             console.error("Error adding product:", error);
         } finally {

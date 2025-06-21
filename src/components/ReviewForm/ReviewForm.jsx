@@ -15,9 +15,8 @@ const ReviewForm = ({ product, orderId, reviewId, initialValues, isEdit = false,
         try {
             setSubmitting(true);
             const accessToken = handleGetAccessToken();
-            
+
             if (isEdit) {
-                // Cập nhật đánh giá
                 await axios.put(
                     `${import.meta.env.VITE_API_URL}/review/update/${reviewId}`,
                     {
@@ -36,7 +35,6 @@ const ReviewForm = ({ product, orderId, reviewId, initialValues, isEdit = false,
                     description: 'Đánh giá của bạn đã được cập nhật!',
                 });
             } else {
-                // Tạo đánh giá mới
                 await axios.post(
                     `${import.meta.env.VITE_API_URL}/review/create`,
                     {
@@ -57,16 +55,14 @@ const ReviewForm = ({ product, orderId, reviewId, initialValues, isEdit = false,
                     description: 'Cảm ơn bạn đã đánh giá sản phẩm!',
                 });
             }
-            
-            // Cập nhật lại dữ liệu review và chi tiết sản phẩm
+
             queryClient.invalidateQueries(['product-details', product._id]);
             queryClient.invalidateQueries(['product-reviews', product._id]);
-            
-            // Nếu có callback onSuccess, gọi nó
+
             if (onSuccess) {
                 onSuccess();
             }
-            
+
             form.resetFields();
             onClose();
         } catch (error) {
@@ -93,7 +89,7 @@ const ReviewForm = ({ product, orderId, reviewId, initialValues, isEdit = false,
             >
                 <Input disabled />
             </Form.Item>
-            
+
             <Form.Item
                 name="rating"
                 label="Đánh giá"
@@ -101,7 +97,7 @@ const ReviewForm = ({ product, orderId, reviewId, initialValues, isEdit = false,
             >
                 <Rate allowHalf />
             </Form.Item>
-            
+
             <Form.Item
                 name="content"
                 label="Nhận xét của bạn"
@@ -117,17 +113,17 @@ const ReviewForm = ({ product, orderId, reviewId, initialValues, isEdit = false,
                     showCount
                 />
             </Form.Item>
-            
+
             <Form.Item className="text-right">
-                <Button 
-                    onClick={onClose} 
+                <Button
+                    onClick={onClose}
                     style={{ marginRight: 8 }}
                 >
                     Hủy
                 </Button>
-                <Button 
-                    type="primary" 
-                    htmlType="submit" 
+                <Button
+                    type="primary"
+                    htmlType="submit"
                     loading={submitting}
                 >
                     {isEdit ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
