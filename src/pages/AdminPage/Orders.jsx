@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, SearchOutlined, FilterOutlined, EyeOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, SearchOutlined, FilterOutlined, EyeOutlined, CalendarOutlined } from "@ant-design/icons";
 import {
     Button,
     Popconfirm,
@@ -16,7 +16,8 @@ import {
     Tooltip,
     Descriptions,
     List,
-    Avatar
+    Avatar,
+    DatePicker
 } from "antd";
 import { useState } from "react";
 import orderService from "../../services/orderService";
@@ -32,6 +33,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
 const Orders = () => {
     const navigate = useNavigate();
@@ -47,6 +49,7 @@ const Orders = () => {
     const [shippingStatusFilter, setShippingStatusFilter] = useState('');
     const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
     const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+    const [dateRange, setDateRange] = useState(null);
 
     const { data: ordersData, isPending: isPendingGetAll } = useQuery({
         queryKey: ["orders", "admin"],
@@ -149,6 +152,11 @@ const Orders = () => {
         setShippingStatusFilter('');
         setPaymentStatusFilter('');
         setPaymentMethodFilter('');
+        setDateRange(null);
+    };
+
+    const handleDateRangeChange = (dates) => {
+        setDateRange(dates);
     };
 
     const filteredOrders = ordersData?.data?.filter(
@@ -158,6 +166,7 @@ const Orders = () => {
             const shippingStatus = order.order?.shippingStatus || '';
             const paymentStatus = order.payment?.paymentStatus || '';
             const paymentMethod = order.payment?.paymentMethod || '';
+            const createdAt = order.order?.createdAt ? new Date(order.order.createdAt) : null;
 
             const searchValue = searchText.toLowerCase();
             const nameEmailMatch = name.toLowerCase().includes(searchValue) ||
@@ -167,7 +176,15 @@ const Orders = () => {
             const paymentStatusMatch = !paymentStatusFilter || paymentStatus === paymentStatusFilter;
             const paymentMethodMatch = !paymentMethodFilter || paymentMethod === paymentMethodFilter;
 
-            return nameEmailMatch && shippingStatusMatch && paymentStatusMatch && paymentMethodMatch;
+            // Kiểm tra lọc theo khoảng thời gian
+            let dateRangeMatch = true;
+            if (dateRange && dateRange[0] && dateRange[1] && createdAt) {
+                const startDate = dateRange[0].startOf('day').toDate();
+                const endDate = dateRange[1].endOf('day').toDate();
+                dateRangeMatch = createdAt >= startDate && createdAt <= endDate;
+            }
+
+            return nameEmailMatch && shippingStatusMatch && paymentStatusMatch && paymentMethodMatch && dateRangeMatch;
         }
     ) || [];
 
@@ -394,7 +411,19 @@ const Orders = () => {
                     </Select>
                 </div>
 
-                {(shippingStatusFilter || paymentStatusFilter || paymentMethodFilter) && (
+                <div className="flex items-center gap-2">
+                    <Text strong>Thời gian đặt hàng:</Text>
+                    <RangePicker
+                        format="DD/MM/YYYY"
+                        onChange={handleDateRangeChange}
+                        value={dateRange}
+                        allowClear
+                        placeholder={['Từ ngày', 'Đến ngày']}
+                        style={{ width: 280 }}
+                    />
+                </div>
+
+                {(shippingStatusFilter || paymentStatusFilter || paymentMethodFilter || dateRange) && (
                     <Button
                         type="link"
                         onClick={handleClearFilters}
