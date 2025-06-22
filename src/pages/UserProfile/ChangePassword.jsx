@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { Form, Input, Button, Card, message, Spin } from "antd";
 import { LockOutlined, KeyOutlined, CheckOutlined } from "@ant-design/icons";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import userService from "../../services/userService";
+import { resetUser } from "../../redux/userStore";
 
 const ChangePassword = () => {
     const [form] = Form.useForm();
     const user = useSelector((state) => state.user);
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const [loading, setLoading] = useState(false);
 
     const onFinish = async (values) => {
@@ -41,8 +43,17 @@ const ChangePassword = () => {
             message.success("Đổi mật khẩu thành công!");
             form.resetFields();
 
-            // Đăng xuất sau khi đổi mật khẩu vì server sẽ xóa refresh token
-            localStorage.removeItem("access_token");
+            // Đăng xuất sau khi đổi mật khẩu
+            try {
+                // Gọi API đăng xuất để xóa refresh token ở server
+                await userService.signOut();
+                // Cập nhật Redux store để đánh dấu đăng xuất
+                dispatch(resetUser());
+                // Xóa access token từ localStorage
+                localStorage.removeItem("access_token");
+            } catch (logoutError) {
+                console.error("Lỗi khi đăng xuất:", logoutError);
+            }
 
             // Chuyển hướng về trang đăng nhập sau khi đổi mật khẩu thành công
             setTimeout(() => {
