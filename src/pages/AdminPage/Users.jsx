@@ -11,6 +11,8 @@ const Users = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [searchText, setSearchText] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
 
     const handleDelete = (userId) => {
         try {
@@ -37,6 +39,12 @@ const Users = () => {
 
     const handleSearch = (value) => {
         setSearchText(value);
+    };
+
+    const handleTableChange = (pagination, filters, sorter) => {
+        setCurrentPage(pagination.current);
+        setPageSize(pagination.pageSize);
+        console.log('params', pagination, filters, sorter);
     };
 
     useEffect(() => {
@@ -69,7 +77,7 @@ const Users = () => {
             key: 'no',
             render: (text, record, index) => (
                 <Tag color="blue" className="text-center font-medium">
-                    {index + 1}
+                    {(currentPage - 1) * pageSize + index + 1}
                 </Tag>
             ),
             width: 70,
@@ -191,13 +199,13 @@ const Users = () => {
                 columns={columns}
                 dataSource={filteredUsers}
                 rowKey="_id"
-                onChange={(pagination, filters, sorter) => {
-                    console.log('params', pagination, filters, sorter);
-                }}
+                onChange={handleTableChange}
                 loading={loading}
                 pagination={{
-                    pageSize: 10,
+                    current: currentPage,
+                    pageSize: pageSize,
                     showSizeChanger: true,
+                    pageSizeOptions: ['5', '10', '20', '50', '100'],
                     showTotal: (total) => `Tổng cộng ${total} người dùng`,
                 }}
                 bordered

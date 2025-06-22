@@ -13,6 +13,8 @@ const Products = () => {
     const [loading, setLoading] = useState(false);
     const [selectedBrand, setSelectedBrand] = useState("Apple");
     const [searchText, setSearchText] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -68,6 +70,11 @@ const Products = () => {
         setSearchText(value);
     };
 
+    const handleTableChange = (pagination) => {
+        setCurrentPage(pagination.current);
+        setPageSize(pagination.pageSize);
+    };
+
     const filteredProducts = products.filter(
         (product) => product.name.toLowerCase().includes(searchText.toLowerCase())
     );
@@ -79,7 +86,7 @@ const Products = () => {
             key: 'no',
             render: (text, record, index) => (
                 <Tag color="blue" className="text-center font-medium">
-                    {index + 1}
+                    {(currentPage - 1) * pageSize + index + 1}
                 </Tag>
             ),
             width: 70,
@@ -249,10 +256,13 @@ const Products = () => {
                 loading={loading}
                 rowKey="_id"
                 pagination={{
-                    pageSize: 10,
+                    current: currentPage,
+                    pageSize: pageSize,
                     showSizeChanger: true,
+                    pageSizeOptions: ['5', '10', '20', '50', '100'],
                     showTotal: (total) => `Tổng cộng ${total} sản phẩm`,
                 }}
+                onChange={handleTableChange}
                 bordered
             />
         </Card>

@@ -17,6 +17,8 @@ const Brands = () => {
     const [editingBrand, setEditingBrand] = useState(null);
     const [editingFile, setEditingFile] = useState(null);
     const [searchText, setSearchText] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
 
     const [editForm] = Form.useForm();
     const [form] = Form.useForm();
@@ -119,6 +121,11 @@ const Brands = () => {
         setSearchText(value);
     };
 
+    const handleTableChange = (pagination) => {
+        setCurrentPage(pagination.current);
+        setPageSize(pagination.pageSize);
+    };
+
     const filteredBrands = brands.filter(
         (brand) =>
             brand.name.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -131,7 +138,7 @@ const Brands = () => {
             dataIndex: 'no',
             render: (text, record, index) => (
                 <Tag color="blue" className="text-center font-medium">
-                    {index + 1}
+                    {(currentPage - 1) * pageSize + index + 1}
                 </Tag>
             ),
             width: 80,
@@ -248,10 +255,13 @@ const Brands = () => {
                 loading={loading}
                 rowKey='_id'
                 pagination={{
-                    pageSize: 10,
+                    current: currentPage,
+                    pageSize: pageSize,
                     showSizeChanger: true,
+                    pageSizeOptions: ['5', '10', '20', '50', '100'],
                     showTotal: (total) => `Tổng cộng ${total} thương hiệu`,
                 }}
+                onChange={handleTableChange}
                 bordered
                 scroll={{ x: 800 }}
             />

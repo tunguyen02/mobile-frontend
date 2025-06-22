@@ -16,6 +16,8 @@ function RefundManagement() {
     const [rejectModalVisible, setRejectModalVisible] = useState(false);
     const [selectedRefund, setSelectedRefund] = useState(null);
     const queryClient = useQueryClient();
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
 
     const { data, isLoading } = useQuery({
         queryKey: ['admin-refunds'],
@@ -92,6 +94,11 @@ function RefundManagement() {
         }
     };
 
+    const handleTableChange = (pagination) => {
+        setCurrentPage(pagination.current);
+        setPageSize(pagination.pageSize);
+    };
+
     const renderStatus = (status) => {
         switch (status) {
             case 'Pending':
@@ -110,6 +117,17 @@ function RefundManagement() {
     };
 
     const columns = [
+        {
+            title: 'STT',
+            key: 'index',
+            render: (text, record, index) => (
+                <Tag color="blue" className="text-center font-medium">
+                    {(currentPage - 1) * pageSize + index + 1}
+                </Tag>
+            ),
+            width: 70,
+            align: 'center',
+        },
         {
             title: 'Mã đơn hàng',
             dataIndex: 'orderId',
@@ -204,10 +222,13 @@ function RefundManagement() {
                 loading={isLoading}
                 rowKey="_id"
                 pagination={{
-                    pageSize: 10,
+                    current: currentPage,
+                    pageSize: pageSize,
                     showSizeChanger: true,
+                    pageSizeOptions: ['5', '10', '20', '50', '100'],
                     showTotal: (total) => `Tổng cộng ${total} yêu cầu hoàn tiền`,
                 }}
+                onChange={handleTableChange}
                 bordered
                 scroll={{ x: 'max-content' }}
             />

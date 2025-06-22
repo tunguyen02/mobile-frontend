@@ -50,6 +50,8 @@ const Orders = () => {
     const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
     const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
     const [dateRange, setDateRange] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(5);
 
     const { data: ordersData, isPending: isPendingGetAll } = useQuery({
         queryKey: ["orders", "admin"],
@@ -196,7 +198,7 @@ const Orders = () => {
             align: "center",
             render: (text, record, index) => (
                 <Tag color="blue" className="text-center font-medium">
-                    {index + 1}
+                    {(currentPage - 1) * pageSize + index + 1}
                 </Tag>
             ),
             width: 60
@@ -344,6 +346,11 @@ const Orders = () => {
         },
     ];
 
+    const handleTableChange = (pagination) => {
+        setCurrentPage(pagination.current);
+        setPageSize(pagination.pageSize);
+    };
+
     return (
         <Card className="shadow-md">
             <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -442,10 +449,13 @@ const Orders = () => {
                 loading={isPendingGetAll}
                 rowKey={(record) => record.order?._id}
                 pagination={{
-                    pageSize: 10,
+                    current: currentPage,
+                    pageSize: pageSize,
                     showSizeChanger: true,
+                    pageSizeOptions: ['5', '10', '20', '50', '100'],
                     showTotal: (total) => `Tổng cộng ${total} đơn hàng`,
                 }}
+                onChange={handleTableChange}
                 bordered
                 scroll={{ x: 'max-content' }}
             />
