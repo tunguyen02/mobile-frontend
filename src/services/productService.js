@@ -172,7 +172,6 @@ const productService = {
         }
     },
 
-    // Tìm sản phẩm theo khoảng giá
     findProductsByPrice: async (targetPrice, range, limit) => {
         try {
             const params = { targetPrice };
@@ -187,7 +186,6 @@ const productService = {
         }
     },
 
-    // Tìm sản phẩm theo camera
     findProductsByCamera: async (cameraSpec, limit) => {
         try {
             const params = { cameraSpec };
@@ -201,7 +199,6 @@ const productService = {
         }
     },
 
-    // Tìm sản phẩm theo pin
     findProductsByBattery: async (batteryCapacity, limit) => {
         try {
             const params = { batteryCapacity };
@@ -215,7 +212,6 @@ const productService = {
         }
     },
 
-    // Tìm sản phẩm cùng loại
     findProductsBySeries: async (productName, limit) => {
         try {
             const params = { productName };
@@ -229,7 +225,6 @@ const productService = {
         }
     },
 
-    // Tìm sản phẩm theo dung lượng bộ nhớ
     findProductsByStorage: async (storage, limit) => {
         try {
             const params = { storage };
@@ -243,7 +238,6 @@ const productService = {
         }
     },
 
-    // Lấy danh sách các thông số camera distinct
     getDistinctCameraSpecs: async () => {
         try {
             const response = await axios.get(`${apiUrl}/product/distinct-camera-specs`);
@@ -254,7 +248,6 @@ const productService = {
         }
     },
 
-    // Lấy danh sách các dung lượng pin distinct
     getDistinctBatteryCapacities: async () => {
         try {
             const response = await axios.get(`${apiUrl}/product/distinct-battery-capacities`);
@@ -265,7 +258,6 @@ const productService = {
         }
     },
 
-    // Lấy danh sách các dung lượng bộ nhớ distinct
     getDistinctStorageOptions: async () => {
         try {
             const response = await axios.get(`${apiUrl}/product/distinct-storage-options`);
@@ -276,7 +268,6 @@ const productService = {
         }
     },
 
-    // Lấy danh sách các series sản phẩm distinct
     getDistinctProductSeries: async () => {
         try {
             const response = await axios.get(`${apiUrl}/product/distinct-product-series`);

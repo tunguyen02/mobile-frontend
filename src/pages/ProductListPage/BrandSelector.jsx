@@ -13,7 +13,7 @@ const BrandSelector = ({ brands, brandsFilter, setBrandsFilter }) => {
 
     const handleApplySelection = () => {
         setBrandsFilter(selectedBrands);
-        setIsPopoverVisible(false); // Đóng popup sau khi nhấn "Xem kết quả"
+        setIsPopoverVisible(false);
     };
 
     const content = (

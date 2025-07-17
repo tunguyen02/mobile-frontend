@@ -132,7 +132,6 @@ const Orders = () => {
         try {
             const values = await form.validateFields();
 
-            // Nếu là VNPay, không cho phép sửa trạng thái thanh toán
             if (currentOrder.payment.paymentMethod === 'VNPay') {
                 values.paymentStatus = currentOrder.payment.paymentStatus;
             }
@@ -178,7 +177,6 @@ const Orders = () => {
             const paymentStatusMatch = !paymentStatusFilter || paymentStatus === paymentStatusFilter;
             const paymentMethodMatch = !paymentMethodFilter || paymentMethod === paymentMethodFilter;
 
-            // Kiểm tra lọc theo khoảng thời gian
             let dateRangeMatch = true;
             if (dateRange && dateRange[0] && dateRange[1] && createdAt) {
                 const startDate = dateRange[0].startOf('day').toDate();

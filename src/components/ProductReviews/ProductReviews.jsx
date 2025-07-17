@@ -16,7 +16,6 @@ const ProductReviews = ({ productId }) => {
     const [currentReview, setCurrentReview] = useState(null);
     const user = useSelector((state) => state.user.user);
 
-    // Lấy danh sách đánh giá sản phẩm
     const { data, isLoading, refetch } = useQuery({
         queryKey: ['product-reviews', productId, page, limit],
         queryFn: async () => {
@@ -44,7 +43,6 @@ const ProductReviews = ({ productId }) => {
         setPage(newPage);
     };
 
-    // Kiểm tra người dùng đã mua sản phẩm này chưa
     const { data: userCanReview, isLoading: checkingPurchase } = useQuery({
         queryKey: ['user-can-review', productId],
         queryFn: async () => {
@@ -69,7 +67,6 @@ const ProductReviews = ({ productId }) => {
         refetchOnWindowFocus: false,
     });
 
-    // Format thời gian
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('vi-VN', {
@@ -157,7 +154,6 @@ const ProductReviews = ({ productId }) => {
                 <Empty description={<span className="text-gray-400">Sản phẩm chưa có đánh giá nào</span>} />
             )}
 
-            {/* Modal chỉnh sửa đánh giá */}
             {currentReview && (
                 <Modal
                     title="Chỉnh sửa đánh giá"

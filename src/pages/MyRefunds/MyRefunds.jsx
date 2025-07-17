@@ -5,7 +5,7 @@ import { Card, Table, Tag, Typography, Spin, Empty, Button, Tooltip } from 'antd
 import { formatCurrency } from '../../utils/utils';
 import { handleGetAccessToken } from '../../services/axiosJWT';
 import refundService from '../../services/refundService';
-import { CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
@@ -105,7 +105,15 @@ function MyRefunds() {
     return (
         <div className="py-10 px-12 bg-gray-100 min-h-screen">
             <Card className="shadow-md">
-                <div className="mb-6">
+                <div className="mb-6 relative">
+                    <Button
+                        type="primary"
+                        icon={<ArrowLeftOutlined />}
+                        onClick={() => navigate('/my-orders')}
+                        className="absolute left-0 top-1/2 transform -translate-y-1/2"
+                    >
+                        Quay lại đơn hàng
+                    </Button>
                     <Title level={2} className="text-center">Yêu cầu hoàn tiền của tôi</Title>
                     <Text className="block text-center text-gray-500">
                         Danh sách các yêu cầu hoàn tiền của bạn và trạng thái xử lý
@@ -121,13 +129,23 @@ function MyRefunds() {
                     />
                 ) : (
                     <Empty
-                        description="Bạn chưa có yêu cầu hoàn tiền nào"
+                        description={
+                            <div>
+                                <p>Bạn chưa có yêu cầu hoàn tiền nào</p>
+                                <p className="text-gray-500 text-sm mt-2">Các yêu cầu hoàn tiền sẽ hiển thị ở đây khi bạn hủy đơn hàng đã thanh toán</p>
+                            </div>
+                        }
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
                     />
                 )}
 
                 <div className="mt-6 flex justify-center">
-                    <Button type="primary" onClick={() => navigate('/my-orders')}>
+                    <Button
+                        type="primary"
+                        size="large"
+                        icon={<ArrowLeftOutlined />}
+                        onClick={() => navigate('/my-orders')}
+                    >
                         Quay lại đơn hàng của tôi
                     </Button>
                 </div>

@@ -4,7 +4,6 @@ import { handleGetAccessToken } from './axiosJWT';
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const chatService = {
-    // Get chat messages for specific user
     getMessages: async (userId) => {
         try {
             const accessToken = handleGetAccessToken();
@@ -19,7 +18,21 @@ const chatService = {
         }
     },
 
-    // Send a new message
+    getNewMessages: async (userId, timestamp) => {
+        try {
+            const accessToken = handleGetAccessToken();
+            const response = await axios.get(`${apiUrl}/chat/new-messages/${userId}`, {
+                params: { timestamp },
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
     sendMessage: async (userId, content, type = 'Text') => {
         try {
             const accessToken = handleGetAccessToken();
@@ -37,7 +50,6 @@ const chatService = {
         }
     },
 
-    // Mark messages as read
     markAsRead: async (userId) => {
         try {
             const accessToken = handleGetAccessToken();
@@ -52,7 +64,6 @@ const chatService = {
         }
     },
 
-    // Get unread message count
     getUnreadCount: async (userId) => {
         try {
             const accessToken = handleGetAccessToken();
@@ -67,7 +78,6 @@ const chatService = {
         }
     },
 
-    // For admin: Get all chats
     getAllChats: async () => {
         try {
             const accessToken = handleGetAccessToken();
@@ -82,7 +92,6 @@ const chatService = {
         }
     },
 
-    // Update chat status (open/closed)
     updateStatus: async (userId, status) => {
         try {
             const accessToken = handleGetAccessToken();

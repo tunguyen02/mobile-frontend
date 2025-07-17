@@ -22,7 +22,6 @@ function UserProfile() {
     const accessToken = handleGetAccessToken();
     const navigate = useNavigate();
 
-    // Fetch user profile on component mount
     useEffect(() => {
         const fetchUserProfile = async () => {
             if (accessToken) {
@@ -46,7 +45,6 @@ function UserProfile() {
         fetchUserProfile();
     }, [accessToken, dispatch, navigate]);
 
-    // Update form fields when user data changes
     useEffect(() => {
         if (user) {
             form.setFieldsValue({
@@ -59,7 +57,6 @@ function UserProfile() {
                 detailedAddress: user?.address?.detailedAddress || '',
             });
 
-            // Update address state
             setAddress({
                 city: user?.address?.city || undefined,
                 district: user?.address?.district || undefined,
@@ -68,14 +65,12 @@ function UserProfile() {
         }
     }, [user, form]);
 
-    //Xử lý địa chỉ
     const [address, setAddress] = useState({
         city: user?.address?.city,
         district: user?.address?.district,
         ward: user?.address?.ward,
     });
 
-    // Lấy danh sách tỉnh, quận và phường dựa trên trạng thái
     const cities = addressVietNam;
     const districts =
         address.city &&
@@ -85,7 +80,6 @@ function UserProfile() {
         address.district &&
         districts?.find((district) => district.name === address.district)?.wards;
 
-    // Xử lý khi chọn tỉnh
     const handleCityChange = (value) => {
         setAddress({
             city: value,
@@ -95,7 +89,6 @@ function UserProfile() {
         form.setFieldsValue({ district: undefined, ward: undefined });
     };
 
-    // Xử lý khi chọn quận
     const handleDistrictChange = (value) => {
         setAddress((prev) => ({
             ...prev,
@@ -105,7 +98,6 @@ function UserProfile() {
         form.setFieldsValue({ ward: undefined });
     };
 
-    // Xử lý khi chọn phường/xã
     const handleWardChange = (value) => {
         setAddress((prev) => ({
             ...prev,
@@ -113,7 +105,6 @@ function UserProfile() {
         }));
     };
 
-    //Xử lý thay ảnh avatar
     const avatarUploadMutation = useMutation({
         mutationFn: (file) => {
             const accessToken = handleGetAccessToken();
@@ -136,7 +127,6 @@ function UserProfile() {
         }
     };
 
-    //Xử lý thay đổi thông tin người dùng
     const mutationUpdateProfile = useMutation({
         mutationFn: (profile) => {
             setLoading(true);

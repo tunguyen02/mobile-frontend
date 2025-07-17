@@ -49,7 +49,6 @@ const FlashSaleSection = () => {
 
     const handleAddToCart = (product, flashSale) => {
         try {
-            // Tìm thông tin sản phẩm flash sale
             const flashSaleProduct = flashSale.products.find(p => p.product._id === product._id);
 
             if (flashSaleProduct) {
@@ -61,7 +60,6 @@ const FlashSaleSection = () => {
                     flashSaleId: flashSale._id
                 };
 
-                // Kiểm tra xem sản phẩm đã có trong giỏ hàng chưa
                 const existingProductIndex = cart.products?.findIndex(item =>
                     item._id === product._id && item.isFlashSale && item.flashSaleId === flashSale._id
                 );
@@ -98,7 +96,6 @@ const FlashSaleSection = () => {
 
     const handleViewProduct = (productId, flashSaleInfo) => {
         try {
-            // Lưu thông tin flash sale vào localStorage để sử dụng ở trang chi tiết
             if (flashSaleInfo) {
                 const flashSaleData = {
                     flashSaleId: flashSaleInfo.flashSaleId,
@@ -117,12 +114,10 @@ const FlashSaleSection = () => {
         }
     };
 
-    // Tính phần trăm đã bán
     const calculateSoldPercentage = (soldCount, totalQuantity) => {
         return (soldCount / totalQuantity) * 100;
     };
 
-    // Kiểm tra sản phẩm bán chạy (đã bán > 50%)
     const isHotSelling = (soldCount, totalQuantity) => {
         return (soldCount / totalQuantity) > 0.5;
     };
@@ -167,10 +162,8 @@ const FlashSaleSection = () => {
         );
     }
 
-    // Lấy flash sale đầu tiên để hiển thị
     const currentFlashSale = activeFlashSales[0];
 
-    // Lọc các sản phẩm trùng lặp dựa trên product._id
     const uniqueProducts = currentFlashSale ? currentFlashSale.products.reduce((unique, item) => {
         const isDuplicate = unique.some((existingItem) =>
             existingItem.product._id === item.product._id
@@ -185,13 +178,11 @@ const FlashSaleSection = () => {
         return unique;
     }, []) : [];
 
-    // Log số lượng sản phẩm để debug
     console.log(`Total unique products in flash sale: ${uniqueProducts.length}`);
     uniqueProducts.forEach((item, index) => {
         console.log(`${index + 1}. ${item.product.name} (ID: ${item.product._id})`);
     });
 
-    // Tính toán số lượng slides cần hiển thị dựa trên số lượng sản phẩm thực tế
     const maxSlidesToShow = Math.min(5, uniqueProducts.length);
     const maxSlidesToScroll = Math.min(5, uniqueProducts.length);
 
@@ -201,7 +192,6 @@ const FlashSaleSection = () => {
                 <div className="text-sm text-yellow-500 font-semibold">KẾT THÚC TRONG</div>
             </div>
 
-            {/* Logo FLASHSALE phong cách như hình */}
             <div className="relative w-full flex justify-center mb-8 pt-6">
                 <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-0.5 w-16 bg-yellow-400 transform -rotate-45"></div>
                 <div className="absolute -right-2 top-1/2 -translate-y-1/2 h-0.5 w-16 bg-yellow-400 transform rotate-45"></div>
@@ -216,7 +206,6 @@ const FlashSaleSection = () => {
 
             <div className="px-4 md:px-10 mx-auto" style={{ maxWidth: '1400px' }}>
                 {uniqueProducts.length <= 2 ? (
-                    // Hiển thị dạng centered flex khi có ít sản phẩm (1-2 sản phẩm)
                     <div className={`flex ${uniqueProducts.length === 1 ? 'justify-center' : 'justify-evenly'} flex-wrap gap-6`}>
                         {uniqueProducts.map((item, index) => {
                             const product = item.product;
@@ -224,7 +213,6 @@ const FlashSaleSection = () => {
                             const soldPercentage = Math.min(100, (item.soldCount / item.quantity) * 100);
                             const hotSelling = soldPercentage > 50;
 
-                            // Tạo đối tượng thông tin flash sale để truyền cho trang chi tiết
                             const flashSaleInfo = {
                                 flashSaleId: currentFlashSale._id,
                                 discountPrice: item.discountPrice,
@@ -239,7 +227,6 @@ const FlashSaleSection = () => {
                                         className="flash-sale-product bg-zinc-900 rounded-lg overflow-hidden cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300"
                                         onClick={() => handleViewProduct(product._id, flashSaleInfo)}
                                     >
-                                        {/* Thêm tag "HOT" nếu đã bán hơn 50% */}
                                         {hotSelling && (
                                             <div className="absolute top-2 left-2 z-10 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                                                 HOT
@@ -293,7 +280,6 @@ const FlashSaleSection = () => {
                         })}
                     </div>
                 ) : (
-                    // Sử dụng Carousel khi có nhiều sản phẩm (≥ 3)
                     <Carousel
                         arrows={uniqueProducts.length > 1}
                         nextArrow={<div className="custom-arrow next-arrow"><RightOutlined /></div>}
@@ -340,7 +326,6 @@ const FlashSaleSection = () => {
                         className="flash-sale-carousel"
                     >
                         {uniqueProducts.map((item, index) => {
-                            // Log vị trí của sản phẩm trong carousel
                             console.log(`Rendering product at position ${index}: ${item.product.name}`);
 
                             const product = item.product;
@@ -348,7 +333,6 @@ const FlashSaleSection = () => {
                             const soldPercentage = Math.min(100, (item.soldCount / item.quantity) * 100);
                             const hotSelling = soldPercentage > 50;
 
-                            // Tạo đối tượng thông tin flash sale để truyền cho trang chi tiết
                             const flashSaleInfo = {
                                 flashSaleId: currentFlashSale._id,
                                 discountPrice: item.discountPrice,
@@ -364,7 +348,6 @@ const FlashSaleSection = () => {
                                         onClick={() => handleViewProduct(product._id, flashSaleInfo)}
                                         style={{ maxWidth: '220px', margin: '0 auto' }}
                                     >
-                                        {/* Thêm tag "HOT" nếu đã bán hơn 50% */}
                                         {hotSelling && (
                                             <div className="absolute top-2 left-2 z-10 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                                                 HOT
@@ -420,7 +403,6 @@ const FlashSaleSection = () => {
                 )}
             </div>
 
-            {/* Hiển thị đếm ngược ở góc phải trên */}
             <div className="absolute right-5 top-14 lg:right-8 lg:top-14 z-10">
                 <div className="countdown-display bg-white px-3 py-1.5 border border-yellow-500 rounded">
                     <Countdown

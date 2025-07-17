@@ -15,7 +15,6 @@ const SpecificationsFilterButton = ({ filters, setFilters }) => {
         selectedOS: filters.selectedOS || []
     });
 
-    // API calls để lấy dữ liệu thông số kỹ thuật
     const { data: storageOptions = [] } = useQuery({
         queryKey: ["storageOptions"],
         queryFn: () => productService.getDistinctStorageOptions(),
@@ -23,11 +22,9 @@ const SpecificationsFilterButton = ({ filters, setFilters }) => {
         select: (data) => data.data || [],
     });
 
-    // Giá trị mặc định cho RAM và OS nếu API không có
     const ramOptions = ["2GB", "3GB", "4GB", "6GB", "8GB", "12GB", "16GB"];
     const osOptions = ["Android", "iOS", "HarmonyOS", "Windows"];
 
-    // Định nghĩa các khoảng dung lượng pin
     const batteryRanges = [
         { value: "0-3000", label: "Dưới 3000 mAh" },
         { value: "3000-4000", label: "3000 mAh - 4000 mAh" },
@@ -35,7 +32,6 @@ const SpecificationsFilterButton = ({ filters, setFilters }) => {
         { value: "5000-", label: "Trên 5000 mAh" }
     ];
 
-    // Định nghĩa các khoảng camera
     const cameraRanges = [
         { value: "0-12", label: "Dưới 12MP" },
         { value: "12-20", label: "12MP - 20MP" },
@@ -44,7 +40,6 @@ const SpecificationsFilterButton = ({ filters, setFilters }) => {
         { value: "108-", label: "Trên 108MP" }
     ];
 
-    // Cập nhật giá trị tạm thời khi popover mở
     const handlePopoverOpen = (visible) => {
         if (visible) {
             setTempSpecs({
@@ -55,7 +50,6 @@ const SpecificationsFilterButton = ({ filters, setFilters }) => {
                 selectedOS: filters.selectedOS || []
             });
         } else {
-            // Khi đóng popover, cập nhật filter tạm thời vào state chính
             setFilters(prev => ({
                 ...prev,
                 selectedBattery: tempSpecs.selectedBattery,
@@ -68,7 +62,6 @@ const SpecificationsFilterButton = ({ filters, setFilters }) => {
         setPopoverVisible(visible);
     };
 
-    // Tính tổng số thông số đã chọn
     const getTotalSpecsSelected = () => {
         return (
             (filters.selectedBattery?.length || 0) +

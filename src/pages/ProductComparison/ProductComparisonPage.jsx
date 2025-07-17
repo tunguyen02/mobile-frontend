@@ -13,7 +13,6 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 const CheckboxGroup = Checkbox.Group;
 
-// CSS nội tuyến để khắc phục vấn đề màu sắc
 const globalSelectStyle = {
     '.ant-select-dropdown': {
         backgroundColor: '#1f2937 !important',
@@ -32,7 +31,6 @@ const globalSelectStyle = {
     }
 };
 
-// CSS cho Select components
 const selectStyles = {
     width: '100%',
     '.ant-select-selector': {
@@ -65,7 +63,6 @@ const ProductComparisonPage = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [loginModalVisible, setLoginModalVisible] = useState(false);
 
-    // Trạng thái cho phần tìm kiếm theo tiêu chí
     const [selectedCriteria, setSelectedCriteria] = useState(['price']);
     const [priceValue, setPriceValue] = useState('');
     const [cameraSpec, setCameraSpec] = useState('');
@@ -74,7 +71,6 @@ const ProductComparisonPage = () => {
     const [storageValue, setStorageValue] = useState('');
     const [searchLoading, setSearchLoading] = useState(false);
 
-    // Danh sách các giá trị từ API
     const [cameraOptions, setCameraOptions] = useState([]);
     const [batteryOptions, setBatteryOptions] = useState([]);
     const [storageOptions, setStorageOptions] = useState([]);

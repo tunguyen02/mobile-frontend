@@ -16,7 +16,6 @@ export const handleGetAccessToken = () => {
 
 axiosJWT.interceptors.request.use(
     async (config) => {
-        // Do something before request is sent
         const currentTime = new Date();
         const access_token = handleGetAccessToken();
         const decoded = jwtDecode(access_token);

@@ -18,21 +18,18 @@ const ChangePassword = () => {
             setLoading(true);
             const { currentPassword, newPassword, confirmPassword } = values;
 
-            // Kiểm tra mật khẩu mới và nhập lại mật khẩu
             if (newPassword !== confirmPassword) {
                 message.error("Mật khẩu nhập lại không khớp!");
                 setLoading(false);
                 return;
             }
 
-            // Kiểm tra mật khẩu mới khác mật khẩu cũ
             if (currentPassword === newPassword) {
                 message.error("Mật khẩu mới phải khác mật khẩu hiện tại!");
                 setLoading(false);
                 return;
             }
 
-            // Gọi API đổi mật khẩu
             await userService.changePassword(
                 user.accessToken,
                 currentPassword,
@@ -43,26 +40,20 @@ const ChangePassword = () => {
             message.success("Đổi mật khẩu thành công!");
             form.resetFields();
 
-            // Đăng xuất sau khi đổi mật khẩu
             try {
-                // Gọi API đăng xuất để xóa refresh token ở server
                 await userService.signOut();
-                // Cập nhật Redux store để đánh dấu đăng xuất
                 dispatch(resetUser());
-                // Xóa access token từ localStorage
                 localStorage.removeItem("access_token");
             } catch (logoutError) {
                 console.error("Lỗi khi đăng xuất:", logoutError);
             }
 
-            // Chuyển hướng về trang đăng nhập sau khi đổi mật khẩu thành công
             setTimeout(() => {
                 navigate("/sign-in");
             }, 1500);
         } catch (error) {
             console.error("Lỗi khi đổi mật khẩu:", error);
 
-            // Hiển thị thông báo lỗi cụ thể từ server nếu có
             if (error.response?.data?.message) {
                 message.error(error.response.data.message);
             } else {

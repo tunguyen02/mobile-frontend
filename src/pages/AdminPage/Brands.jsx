@@ -266,7 +266,6 @@ const Brands = () => {
                 scroll={{ x: 800 }}
             />
 
-            {/* Modal thêm thương hiệu */}
             <Modal
                 title={<Title level={4}>Thêm thương hiệu mới</Title>}
                 open={isModalOpen}
@@ -333,7 +332,6 @@ const Brands = () => {
                 </Spin>
             </Modal>
 
-            {/* Modal chỉnh sửa thương hiệu */}
             <Modal
                 title={<Title level={4}>Chỉnh sửa thương hiệu</Title>}
                 open={isEditModalOpen}

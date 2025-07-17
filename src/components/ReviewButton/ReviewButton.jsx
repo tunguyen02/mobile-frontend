@@ -10,14 +10,13 @@ const ReviewButton = ({ product, orderId }) => {
     const [hasReviewed, setHasReviewed] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Kiểm tra xem người dùng đã đánh giá sản phẩm này trong đơn hàng chưa
     useEffect(() => {
         const checkReviewStatus = async () => {
             try {
                 setLoading(true);
                 const accessToken = handleGetAccessToken();
                 const response = await axios.get(
-                    `${import.meta.env.VITE_API_URL}/review/check`, 
+                    `${import.meta.env.VITE_API_URL}/review/check`,
                     {
                         params: {
                             productId: product._id,

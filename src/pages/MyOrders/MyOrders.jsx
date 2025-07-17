@@ -2,11 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { handleGetAccessToken } from "../../services/axiosJWT";
 import orderService from "../../services/orderService";
-import { Spin, Tabs, Empty } from "antd";
+import { Spin, Tabs, Empty, Button } from "antd";
 import OrderCard from "../../components/OrderCard/OrderCard";
+import { useNavigate } from "react-router-dom";
+import { SwapOutlined } from "@ant-design/icons";
 
 function MyOrders() {
     const [activeTab, setActiveTab] = useState("all");
+    const navigate = useNavigate();
 
     const { data, isPending } = useQuery({
         queryKey: ["my-orders"],
@@ -25,6 +28,10 @@ function MyOrders() {
         if (!data?.orders || !data.orders.length) return [];
         if (status === "all") return data.orders;
         return data.orders.filter(order => order.shippingStatus === status);
+    };
+
+    const handleViewRefunds = () => {
+        navigate('/my-refunds');
     };
 
     const tabItems = [
@@ -117,13 +124,33 @@ function MyOrders() {
                     )}
                 </div>
             )
+        },
+        {
+            key: "refunds",
+            label: (
+                <span className="text-blue-500 font-medium">
+                    <SwapOutlined /> Yêu cầu hoàn tiền
+                </span>
+            ),
+            children: (
+                <div className="flex flex-col gap-4 mt-4 p-2">
+                    <div className="text-center p-4">
+                        <p className="mb-4">Xem tất cả các yêu cầu hoàn tiền của bạn và trạng thái xử lý</p>
+                        <Button type="primary" onClick={handleViewRefunds} size="large">
+                            Xem yêu cầu hoàn tiền
+                        </Button>
+                    </div>
+                </div>
+            )
         }
     ];
 
     return (
         <Spin spinning={isPending}>
-            <div className="font-bold text-white text-2xl text-center mt-12">Đơn hàng của tôi</div>
-            <div className="px-40 py-8">
+            <div className="font-bold text-white text-2xl text-center mt-12">
+                Đơn hàng của tôi
+            </div>
+            <div className="px-4 md:px-12 lg:px-40 py-8">
                 <Tabs
                     defaultActiveKey="all"
                     items={tabItems}

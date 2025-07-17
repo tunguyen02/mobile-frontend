@@ -20,7 +20,6 @@ function ProductListPage() {
     const searchQuery = searchParams.get("search") || "";
     const [sortOrder, setSortOrder] = useState(searchParams.get("sort") || "");
 
-    // Tạo state filters chung cho tất cả các loại filter
     const [filters, setFilters] = useState({
         selectedBrands: searchParams.getAll("brands") || [],
         priceRange: searchParams.get("price") || "",
@@ -31,7 +30,6 @@ function ProductListPage() {
         selectedOS: searchParams.getAll("os") || []
     });
 
-    // State lưu trữ filters đã được áp dụng (chỉ khi nút Lọc được nhấn)
     const [appliedFilters, setAppliedFilters] = useState({ ...filters });
 
     const [pagination, setPagination] = useState({ page: 1, pageSize: 12 });
@@ -42,7 +40,6 @@ function ProductListPage() {
             console.log("Calling brandService.getAllBrands()");
             const response = await brandService.getAllBrands();
             console.log("Raw API response:", response);
-            // The API returns the brands array directly, not wrapped in a data property
             return response;
         },
         enabled: true,
@@ -51,7 +48,6 @@ function ProductListPage() {
         refetchOnWindowFocus: false
     });
 
-    // Log để debug
     useEffect(() => {
         console.log("Brands data:", brands);
         console.log("Brands structure:", JSON.stringify(brands, null, 2));
@@ -59,7 +55,6 @@ function ProductListPage() {
     }, [brands, isBrandsPending]);
 
 
-    // Query products với các filter đã APPLY (không phải filters state)
     const { data = [], isPending: isProductsPending } = useQuery({
         queryKey: ["products", {
             searchQuery,
@@ -88,13 +83,11 @@ function ProductListPage() {
         refetchOnWindowFocus: false,
     });
 
-    // Hàm áp dụng filters hiện tại
     const applyCurrentFilters = () => {
         setAppliedFilters({ ...filters });
         updateUrlParams({ ...filters });
     };
 
-    // Cập nhật URL từ appliedFilters
     const updateUrlParams = (filters) => {
         const params = new URLSearchParams();
 
@@ -124,7 +117,6 @@ function ProductListPage() {
         setSearchParams(params);
     };
 
-    // Cập nhật URL khi sort order hoặc search query thay đổi
     useEffect(() => {
         updateUrlParams(appliedFilters);
     }, [sortOrder, searchQuery]);
@@ -144,7 +136,6 @@ function ProductListPage() {
         navigate(`/product/product-details/${product._id}`);
     };
 
-    // Hàm xóa một filter cụ thể
     const removeFilter = (type, value) => {
         const updatedFilters = { ...filters };
 
@@ -177,7 +168,6 @@ function ProductListPage() {
         setFilters(updatedFilters);
     };
 
-    // Xóa tất cả filter
     const clearAllFilters = () => {
         const emptyFilters = {
             selectedBrands: [],
@@ -191,7 +181,6 @@ function ProductListPage() {
         setFilters(emptyFilters);
     };
 
-    // Kiểm tra có bất kỳ bộ lọc nào được áp dụng
     const hasActiveFilters = appliedFilters.selectedBrands.length > 0 ||
         appliedFilters.priceRange ||
         appliedFilters.selectedBattery.length > 0 ||
@@ -203,10 +192,8 @@ function ProductListPage() {
     return (
         <div className="flex justify-center py-10">
             <div className="w-10/12 h-full flex flex-col gap-6 items-center justify-between">
-                {/* Top bar with filters and sorting */}
                 <div className="flex flex-wrap px-5 justify-between bg-neutral-700 rounded-xl py-4 gap-5 w-full">
                     <div className="flex flex-wrap gap-3 items-center">
-                        {/* Hiển thị các nút filter riêng biệt */}
                         <BrandFilterButton
                             brands={brands}
                             filters={filters}
@@ -223,7 +210,6 @@ function ProductListPage() {
                             setFilters={setFilters}
                         />
 
-                        {/* Nút lọc tổng hợp ở cuối */}
                         <FilterPopover
                             filters={filters}
                             setFilters={setFilters}

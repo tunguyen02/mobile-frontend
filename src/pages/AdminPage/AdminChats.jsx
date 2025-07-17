@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Card, List, Avatar, Badge, Input, Form, Button, Tabs, Typography, Spin, Empty, message } from 'antd';
-import { UserOutlined, SendOutlined } from '@ant-design/icons';
+import { UserOutlined, SendOutlined, SyncOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
 import socket from '../../utils/socket';
 import chatService from '../../services/chatService';
 import {
@@ -22,39 +22,19 @@ const AdminChats = () => {
     const [loading, setLoading] = useState(true);
     const [chatLoading, setChatLoading] = useState(false);
     const [typingUsers, setTypingUsers] = useState({});
+    const [socketConnected, setSocketConnected] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+    const lastMessageTimestampRef = useRef({});
+    const pollingIntervalRef = useRef(null);
+    const socketPingIntervalRef = useRef(null);
 
     const dispatch = useDispatch();
     const user = useSelector((state) => state.user);
     const { messages, activeChat, allChats } = useSelector((state) => state.chat);
 
-
-    useEffect(() => {
-        if (user.role === 'Admin') {
-            // Connect to socket
-            socket.connect();
-            console.log('Admin socket connecting...');
-            socket.emit('join', { userId: user._id, role: user.role });
-            console.log('Emitted join event with:', { userId: user._id, role: user.role });
-
-            // Load all chats
-            fetchAllChats();
-
-            // Setup socket event listeners
-            setupSocketListeners();
-
-            return () => {
-                cleanupSocketListeners();
-            };
-        }
-    }, [user._id, user.role]);
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
-
-    const fetchAllChats = async () => {
+    const fetchAllChats = useCallback(async () => {
         try {
             setLoading(true);
             console.log('Fetching all chats for admin');
@@ -66,15 +46,27 @@ const AdminChats = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [dispatch]);
 
-    const fetchMessages = async (userId) => {
+    const fetchMessages = useCallback(async (userId) => {
         try {
             setChatLoading(true);
+            console.log(`Fetching messages for user: ${userId}`);
             const response = await chatService.getMessages(userId);
 
             if (activeChat?.userId?._id === userId) {
                 dispatch(setMessages(response.data?.messages || []));
+
+                if (response.data?.messages?.length > 0) {
+                    const sortedMessages = [...response.data.messages].sort((a, b) =>
+                        new Date(a.createdAt) - new Date(b.createdAt)
+                    );
+                    const latestMsg = sortedMessages[sortedMessages.length - 1];
+                    lastMessageTimestampRef.current[userId] = new Date(latestMsg.createdAt).toISOString();
+                }
+
+                markAsRead(userId);
+                forceScrollToBottom();
             }
         } catch (error) {
             console.error('Error fetching messages:', error);
@@ -82,63 +74,208 @@ const AdminChats = () => {
         } finally {
             setChatLoading(false);
         }
-    };
+    }, [activeChat, dispatch]);
 
-    const markAsRead = async (userId) => {
+    const fetchNewMessages = useCallback(async (userId) => {
+        if (!userId || !lastMessageTimestampRef.current[userId]) {
+            return fetchMessages(userId);
+        }
+
+        try {
+            const timestamp = lastMessageTimestampRef.current[userId];
+            console.log(`Fetching new messages for user ${userId} after:`, timestamp);
+
+            const response = await chatService.getNewMessages(userId, timestamp);
+
+            if (response.data?.messages?.length > 0 && activeChat?.userId?._id === userId) {
+                console.log(`Found ${response.data.messages.length} new messages`);
+
+                response.data.messages.forEach(newMsg => {
+                    dispatch(addMessage(newMsg));
+                });
+
+                const sortedMessages = [...response.data.messages].sort((a, b) =>
+                    new Date(a.createdAt) - new Date(b.createdAt)
+                );
+                if (sortedMessages.length > 0) {
+                    const latestMsg = sortedMessages[sortedMessages.length - 1];
+                    lastMessageTimestampRef.current[userId] = new Date(latestMsg.createdAt).toISOString();
+                }
+
+                forceScrollToBottom();
+            }
+        } catch (error) {
+            console.error('Error fetching new messages:', error);
+        }
+    }, [activeChat, dispatch, fetchMessages]);
+
+    const markAsRead = useCallback(async (userId) => {
         try {
             await chatService.markAsRead(userId);
         } catch (error) {
             console.error('Error marking as read:', error);
         }
-    };
+    }, []);
 
-    const handleNewUserMessage = ({ userId, message }) => {
+    const handleNewUserMessage = useCallback(({ userId, message }) => {
+        console.log('Admin received new message:', { userId, message });
+
         if (!userId || !message || !message._id) {
             console.warn('Invalid message data received:', { userId, message });
             return;
         }
 
+        fetchAllChats();
+
         if (activeChat?.userId?._id === userId) {
-            const isDuplicate = messages.some(msg => msg._id === message._id);
+            console.log('Adding new message to active chat:', message);
+            dispatch(addMessage(message));
 
-            if (!isDuplicate) {
-                console.log('Adding new user message to chat:', message);
-                dispatch(addMessage(message));
-                markAsRead(userId);
-                setTimeout(scrollToBottom, 100);
-            } else {
-                console.log('Duplicate message detected, ignoring:', message);
+            markAsRead(userId);
+
+            if (message.createdAt) {
+                lastMessageTimestampRef.current[userId] = new Date(message.createdAt).toISOString();
             }
+
+            forceScrollToBottom();
         } else {
-            console.log('Message for non-active chat, refreshing chat list');
-            fetchAllChats();
+            console.log('Message for non-active chat, refreshing chat list only');
         }
-    };
+    }, [activeChat, dispatch, fetchAllChats, markAsRead]);
 
-    const handleOnlineUsers = (userIds) => {
+    useEffect(() => {
+        if (user.role === 'Admin') {
+            const initSocket = () => {
+                console.log('Admin initializing socket connection...');
+
+                if (!socket.connected) {
+                    socket.connect();
+                }
+
+                socket.on('connect', () => {
+                    console.log('Admin socket connected with ID:', socket.id);
+                    setSocketConnected(true);
+
+                    socket.emit('join', { userId: user._id, role: 'Admin' });
+                    console.log('Admin joined socket with ID:', user._id);
+
+                    fetchAllChats();
+                });
+
+                socket.on('connect_error', (err) => {
+                    console.error('Socket connection error:', err);
+                    setSocketConnected(false);
+                    message.error('Không thể kết nối đến server chat');
+                });
+
+                socket.on('disconnect', () => {
+                    console.log('Admin socket disconnected');
+                    setSocketConnected(false);
+
+                    setTimeout(() => {
+                        if (!socket.connected) {
+                            console.log('Attempting to reconnect socket...');
+                            socket.connect();
+                        }
+                    }, 1000);
+                });
+
+                socket.on('newUserMessage', handleNewUserMessage);
+                socket.on('onlineUsers', handleOnlineUsers);
+                socket.on('userOnline', handleUserOnline);
+                socket.on('userOffline', handleUserOffline);
+                socket.on('typing', handleTyping);
+                socket.on('error', (error) => {
+                    console.error('Socket error:', error);
+                    message.error(`Lỗi kết nối: ${error}`);
+                });
+            };
+
+            initSocket();
+
+            pollingIntervalRef.current = setInterval(() => {
+                if (activeChat?.userId?._id) {
+                    fetchNewMessages(activeChat.userId._id);
+                }
+            }, 500);
+
+            socketPingIntervalRef.current = setInterval(() => {
+                if (socket.connected) {
+                    socket.emit('ping', { userId: user._id });
+                } else {
+                    console.log('Socket not connected, attempting to reconnect...');
+                    socket.connect();
+                    socket.emit('join', { userId: user._id, role: 'Admin' });
+                }
+            }, 5000);
+
+            return () => {
+                console.log('Cleaning up socket connections and intervals');
+                socket.off('connect');
+                socket.off('connect_error');
+                socket.off('disconnect');
+                socket.off('newUserMessage');
+                socket.off('onlineUsers');
+                socket.off('userOnline');
+                socket.off('userOffline');
+                socket.off('typing');
+                socket.off('error');
+
+                if (pollingIntervalRef.current) {
+                    clearInterval(pollingIntervalRef.current);
+                }
+
+                if (socketPingIntervalRef.current) {
+                    clearInterval(socketPingIntervalRef.current);
+                }
+
+                socket.disconnect();
+            };
+        }
+    }, [user._id, user.role, handleNewUserMessage, fetchAllChats, fetchNewMessages]);
+
+    useEffect(() => {
+        if (activeChat?.userId?._id) {
+            fetchMessages(activeChat.userId._id);
+        }
+    }, [activeChat, fetchMessages]);
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            forceScrollToBottom();
+        }
+    }, [messages]);
+
+    const handleOnlineUsers = useCallback((userIds) => {
         console.log('Online users:', userIds);
-    };
+    }, []);
 
-    const handleUserOnline = (userId) => {
+    const handleUserOnline = useCallback((userId) => {
         console.log('User came online:', userId);
-    };
+    }, []);
 
-    const handleUserOffline = (userId) => {
+    const handleUserOffline = useCallback((userId) => {
         console.log('User went offline:', userId);
-    };
+    }, []);
 
-    const handleTyping = ({ userId, isTyping }) => {
+    const handleTyping = useCallback(({ userId, isTyping }) => {
         setTypingUsers(prev => ({
             ...prev,
             [userId]: isTyping
         }));
-    };
+    }, []);
 
-    const handleChatSelect = (chat) => {
+    const handleChatSelect = useCallback((chat) => {
         dispatch(setActiveChat(chat));
         fetchMessages(chat.userId._id);
-        markAsRead(chat.userId._id);
-    };
+    }, [dispatch, fetchMessages]);
+
+    const handleManualRefresh = useCallback(() => {
+        if (activeChat?.userId?._id) {
+            message.info('Đang làm mới tin nhắn...');
+            fetchMessages(activeChat.userId._id);
+        }
+    }, [activeChat, fetchMessages]);
 
     const handleSendMessage = async (values) => {
         if (!activeChat || !values.message?.trim()) return;
@@ -161,8 +298,9 @@ const AdminChats = () => {
                 tempMessage: true
             };
 
+            // Add the temporary message
             dispatch(addMessage(tempMessage));
-            setTimeout(scrollToBottom, 10); // Giảm thời gian timeout
+            forceScrollToBottom();
 
             let messageSent = false;
 
@@ -180,7 +318,11 @@ const AdminChats = () => {
 
                     if (data?.messages?.length > 0) {
                         const newMessage = data.messages[data.messages.length - 1];
+
                         dispatch(replaceMessage({ tempId: tempMessage._id, newMessage }));
+
+                        lastMessageTimestampRef.current[activeChat.userId._id] =
+                            new Date(newMessage.createdAt).toISOString();
                     }
 
                     socket.off('messageSent', messageConfirmHandler);
@@ -188,54 +330,66 @@ const AdminChats = () => {
                 };
 
                 socket.once('messageSent', messageConfirmHandler);
-                socket.emit('sendMessage', messageData);
+
+                if (!socket.connected) {
+                    console.log('Socket not connected, reconnecting before sending message...');
+                    socket.connect();
+
+                    socket.once('connect', () => {
+                        console.log('Socket reconnected, joining and sending message...');
+                        socket.emit('join', { userId: user._id, role: 'Admin' });
+                        socket.emit('sendMessage', messageData);
+                    });
+                } else {
+                    console.log('Socket connected, sending message immediately');
+                    socket.emit('sendMessage', messageData);
+                }
 
                 setTimeout(() => {
                     if (!messageSent) {
                         socket.off('messageSent', messageConfirmHandler);
                         reject(new Error('Socket timeout'));
                     }
-                }, 1000);
+                }, 500);
             });
 
-            socketPromise.catch(async (error) => {
-                console.log('Falling back to API due to:', error);
+            const apiPromise = chatService.sendMessage(activeChat.userId._id, messageContent)
+                .then(response => {
+                    console.log('Message sent via API:', response);
 
-                if (!messageSent) {
-                    try {
-                        const response = await chatService.sendMessage(activeChat.userId._id, messageContent);
-                        console.log('Message sent via API:', response);
+                    if (!messageSent && response?.data?.messages?.length > 0) {
+                        const apiMessage = response.data.messages[response.data.messages.length - 1];
 
-                        if (response?.data?.messages?.length > 0) {
-                            const apiMessage = response.data.messages[response.data.messages.length - 1];
-                            dispatch(replaceMessage({ tempId: tempMessage._id, newMessage: apiMessage }));
-                            messageSent = true;
-                        }
-                    } catch (apiError) {
-                        console.error('Error sending message via API:', apiError);
-                        if (!messageSent) {
-                            message.error('Không thể gửi tin nhắn');
-                            dispatch(markMessageAsFailed(tempMessage._id));
-                        }
+                        dispatch(replaceMessage({ tempId: tempMessage._id, newMessage: apiMessage }));
+
+                        lastMessageTimestampRef.current[activeChat.userId._id] =
+                            new Date(apiMessage.createdAt).toISOString();
+
+                        messageSent = true;
                     }
-                }
-            });
+                    return response;
+                })
+                .catch(error => {
+                    console.error('Error sending message via API:', error);
+                    if (!messageSent) {
+                        message.error('Không thể gửi tin nhắn');
+                        dispatch(markMessageAsFailed(tempMessage._id));
+                    }
+                    throw error;
+                });
+
+            Promise.race([socketPromise, apiPromise])
+                .then(() => {
+                    console.log('Message sent successfully via either socket or API');
+                })
+                .catch(error => {
+                    console.error('Both socket and API failed:', error);
+                });
 
         } catch (error) {
             console.error('Error sending message:', error);
             message.error('Không thể gửi tin nhắn');
         }
-    };
-
-    const handleInputChange = (e) => {
-        if (!activeChat) return;
-
-        const isAdminTyping = e.target.value.length > 0;
-        socket.emit('typing', {
-            userId: activeChat.userId._id,
-            isTyping: isAdminTyping,
-            sender: 'Admin'
-        });
     };
 
     const handleStatusChange = async (userId, status) => {
@@ -249,40 +403,54 @@ const AdminChats = () => {
 
     const scrollToBottom = () => {
         if (messagesEndRef.current) {
-            setTimeout(() => {
-                messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }, 100);
+            try {
+                messagesEndRef.current.scrollIntoView({
+                    behavior: 'instant',
+                    block: 'end'
+                });
+            } catch (error) {
+                console.error('Error scrolling to bottom:', error);
+                try {
+                    const chatContainer = document.querySelector('.admin-chat-messages');
+                    if (chatContainer) {
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                } catch (fallbackError) {
+                    console.error('Fallback scroll failed:', fallbackError);
+                }
+            }
         }
     };
 
-    useEffect(() => {
-        if (activeChat) {
-            setTimeout(scrollToBottom, 200);
-        }
-    }, [activeChat]);
-
-    useEffect(() => {
-        if (messages && messages.length > 0) {
-            scrollToBottom();
-        }
-    }, [messages]);
+    const forceScrollToBottom = () => {
+        setTimeout(scrollToBottom, 10);
+        setTimeout(scrollToBottom, 50);
+        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 200);
+    };
 
     const renderMessageItem = (message) => {
         const isAdmin = message.sender === 'Admin';
-
         return (
-            <div key={message._id} className={`mb-3 flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
+            <div key={message._id || Date.now()} className={`mb-3 flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
+                {!isAdmin && (
+                    <Badge dot status={message.isRead ? "default" : "processing"}>
+                        <Avatar size="small" className="mr-2" icon={<UserOutlined />} />
+                    </Badge>
+                )}
                 <div
                     className={`max-w-[70%] px-3 py-2 rounded-lg ${isAdmin
                         ? message.failed
                             ? 'bg-red-100 text-red-800 rounded-br-sm'
                             : message.tempMessage
                                 ? 'bg-blue-300 text-white rounded-br-sm'
-                                : 'bg-blue-500 text-white rounded-br-sm'
-                        : 'bg-white text-gray-800 rounded-bl-sm'
+                                : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm shadow'
+                        : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
                         }`}
                 >
-                    <div className="break-words">{message.content}</div>
+                    <div className={`${isAdmin ? 'text-white' : 'text-gray-800'} ${message.failed ? 'text-red-800' : ''}`}>
+                        {message.content}
+                    </div>
                     <div
                         className={`text-xs mt-1 text-right flex items-center justify-end ${isAdmin
                             ? message.failed
@@ -313,33 +481,8 @@ const AdminChats = () => {
         );
     };
 
-    const setupSocketListeners = () => {
-        cleanupSocketListeners();
-
-        // Setup new listeners
-        console.log('Setting up admin socket listeners');
-        socket.on('newUserMessage', handleNewUserMessage);
-        socket.on('onlineUsers', handleOnlineUsers);
-        socket.on('userOnline', handleUserOnline);
-        socket.on('userOffline', handleUserOffline);
-        socket.on('typing', handleTyping);
-
-        socket.on('error', (error) => {
-            console.error('Socket error:', error);
-            message.error(`Lỗi kết nối: ${error}`);
-        });
-    };
-
-    const cleanupSocketListeners = () => {
-        console.log('Cleaning up admin socket listeners');
-        socket.off('newUserMessage');
-        socket.off('onlineUsers');
-        socket.off('userOnline');
-        socket.off('userOffline');
-        socket.off('typing');
-        socket.off('error');
-        socket.off('messageSent');
-        socket.disconnect();
+    const toggleSidebar = () => {
+        setSidebarCollapsed(!sidebarCollapsed);
     };
 
     if (user.role !== 'Admin') {
@@ -351,11 +494,20 @@ const AdminChats = () => {
     }
 
     return (
-        <div className="h-screen flex flex-col overflow-hidden p-6 pb-4">
-            <Title level={2} className="mb-4">Chăm sóc khách hàng</Title>
+        <div className="h-screen flex flex-col overflow-hidden p-4 sm:p-6 pb-4">
+            <Title level={2} className="mb-4 text-xl sm:text-2xl flex justify-between items-center">
+                <span>Chăm sóc khách hàng</span>
+                <Button
+                    icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                    onClick={toggleSidebar}
+                    className="lg:hidden"
+                />
+            </Title>
 
-            <div className="flex gap-6 flex-1 overflow-hidden" style={{ maxHeight: "calc(100vh - 150px)" }}>
-                <div className="w-[30%] min-w-[300px] flex flex-col overflow-hidden bg-white rounded-lg shadow">
+            <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 flex-1 overflow-hidden" style={{ maxHeight: "calc(100vh - 150px)" }}>
+                <div
+                    className={`${sidebarCollapsed ? 'hidden' : 'block'} lg:block w-full lg:w-[30%] lg:min-w-[300px] flex flex-col overflow-hidden bg-white rounded-lg shadow transition-all duration-300`}
+                >
                     <div className="p-3 border-b">
                         <Tabs defaultActiveKey="all" className="m-0">
                             <TabPane tab="All Chats" key="all" />
@@ -369,45 +521,61 @@ const AdminChats = () => {
                             </div>
                         ) : (
                             <>
-                                {allChats.map(chat => {
-                                    const lastMessage = chat.messages[chat.messages.length - 1];
-                                    const hasUnread = chat.messages.some(msg =>
-                                        msg.sender === 'User' && !msg.isRead
-                                    );
+                                {allChats.length === 0 ? (
+                                    <div className="p-4 text-center text-gray-500">
+                                        Không có cuộc trò chuyện nào
+                                    </div>
+                                ) : (
+                                    allChats.map(chat => {
+                                        const lastMessage = chat.messages[chat.messages.length - 1];
+                                        const hasUnread = chat.messages.some(msg =>
+                                            msg.sender === 'User' && !msg.isRead
+                                        );
 
-                                    return (
-                                        <div
-                                            key={chat._id}
-                                            onClick={() => handleChatSelect(chat)}
-                                            className={`p-3 cursor-pointer transition hover:bg-gray-100 ${activeChat?.userId?._id === chat.userId._id ? 'bg-blue-50' : ''}`}
-                                        >
-                                            <div className="flex items-center">
-                                                <Badge dot={hasUnread} status="processing">
-                                                    <Avatar icon={<UserOutlined />} src={chat.userId.avatarUrl} />
-                                                </Badge>
-                                                <div className="ml-3 flex-1">
-                                                    <div className="flex justify-between items-center">
-                                                        <Text>{chat.userId.name || chat.userId.email}</Text>
-                                                        <Text type="secondary" className="text-xs">
-                                                            {chat.status === 'Open' ? (
-                                                                <Badge status="success" text="Open" />
-                                                            ) : (
-                                                                <Badge status="default" text="Closed" />
-                                                            )}
-                                                        </Text>
+                                        return (
+                                            <div
+                                                key={chat._id}
+                                                onClick={() => {
+                                                    handleChatSelect(chat);
+                                                    if (window.innerWidth < 1024) {
+                                                        setSidebarCollapsed(true);
+                                                    }
+                                                }}
+                                                className={`p-3 cursor-pointer transition hover:bg-gray-100 ${activeChat?.userId?._id === chat.userId._id ? 'bg-blue-50' : ''}`}
+                                            >
+                                                <div className="flex items-center">
+                                                    <Badge dot={hasUnread} status="processing">
+                                                        <Avatar icon={<UserOutlined />} src={chat.userId.avatarUrl} />
+                                                    </Badge>
+                                                    <div className="ml-3 flex-1 min-w-0">
+                                                        <div className="flex justify-between items-center">
+                                                            <Text ellipsis className="font-medium">{chat.userId.name || chat.userId.email}</Text>
+                                                            <Text type="secondary" className="text-xs ml-2 flex-shrink-0">
+                                                                {chat.status === 'Open' ? (
+                                                                    <Badge status="success" text="Open" />
+                                                                ) : (
+                                                                    <Badge status="default" text="Closed" />
+                                                                )}
+                                                            </Text>
+                                                        </div>
+                                                        {lastMessage ? (
+                                                            <div className="flex justify-between items-center">
+                                                                <Text ellipsis className="text-gray-500 max-w-[70%]">
+                                                                    {lastMessage.content}
+                                                                </Text>
+                                                                <Text className="text-xs text-gray-400 ml-2">
+                                                                    {new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </Text>
+                                                            </div>
+                                                        ) : (
+                                                            <Text type="secondary" className="text-xs">Chưa có tin nhắn</Text>
+                                                        )}
                                                     </div>
-                                                    {lastMessage ? (
-                                                        <Text ellipsis className="text-gray-500">
-                                                            {lastMessage.content}
-                                                        </Text>
-                                                    ) : (
-                                                        <Text type="secondary">No messages yet</Text>
-                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })
+                                )}
                             </>
                         )}
                     </div>
@@ -416,47 +584,67 @@ const AdminChats = () => {
                 <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-lg shadow">
                     {activeChat ? (
                         <>
-                            {/* Header chat - làm ngắn hơn */}
-                            <div className="py-2 px-4 border-b border-gray-200 bg-white">
-                                <div className="flex justify-between items-center">
-                                    <div className="flex items-center">
-                                        <Text strong className="mr-2">{activeChat.userId?.name || activeChat.userId?.email}</Text>
-                                        <Text type="secondary">
-                                            {activeChat.status === 'Open' ?
-                                                <Badge status="success" text="Open" /> :
-                                                <Badge status="default" text="Closed" />
-                                            }
-                                        </Text>
-                                    </div>
-                                    <div>
-                                        {activeChat.status === 'Open' ? (
-                                            <Button size="small" onClick={() => handleStatusChange(activeChat.userId._id, 'Closed')}>
-                                                Close Chat
-                                            </Button>
-                                        ) : (
-                                            <Button size="small" onClick={() => handleStatusChange(activeChat.userId._id, 'Open')}>
-                                                Reopen Chat
-                                            </Button>
-                                        )}
-                                    </div>
+                            <div className="py-2 px-4 border-b border-gray-200 bg-white flex justify-between items-center flex-wrap gap-2">
+                                {sidebarCollapsed && (
+                                    <Button
+                                        icon={<MenuUnfoldOutlined />}
+                                        onClick={toggleSidebar}
+                                        size="small"
+                                        className="mr-2 lg:hidden"
+                                    />
+                                )}
+                                <div className="flex items-center">
+                                    <Avatar
+                                        size="small"
+                                        className="mr-2"
+                                        icon={<UserOutlined />}
+                                        src={activeChat.userId?.avatarUrl}
+                                    />
+                                    <Text strong className="mr-2">{activeChat.userId?.name || activeChat.userId?.email}</Text>
+                                    <Text type="secondary">
+                                        {activeChat.status === 'Open' ?
+                                            <Badge status="success" text="Open" /> :
+                                            <Badge status="default" text="Closed" />
+                                        }
+                                    </Text>
+                                </div>
+                                <div className="flex items-center">
+                                    <Button
+                                        size="small"
+                                        onClick={handleManualRefresh}
+                                        icon={<SyncOutlined />}
+                                        className="mr-2"
+                                        title="Làm mới tin nhắn"
+                                    >
+                                        <span className="hidden sm:inline">Làm mới</span>
+                                    </Button>
+                                    {activeChat.status === 'Open' ? (
+                                        <Button size="small" onClick={() => handleStatusChange(activeChat.userId._id, 'Closed')}>
+                                            Close Chat
+                                        </Button>
+                                    ) : (
+                                        <Button size="small" onClick={() => handleStatusChange(activeChat.userId._id, 'Open')}>
+                                            Reopen Chat
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto bg-gray-100 p-4">
+                            <div className="flex-1 overflow-y-auto bg-gray-100 p-4 admin-chat-messages">
                                 {chatLoading ? (
                                     <div className="h-full flex justify-center items-center">
                                         <Spin />
                                     </div>
                                 ) : messages.length === 0 ? (
                                     <div className="h-full flex justify-center items-center text-gray-500">
-                                        No messages yet
+                                        Chưa có tin nhắn
                                     </div>
                                 ) : (
                                     <div className="flex flex-col">
                                         {messages.map(message => renderMessageItem(message))}
                                         {typingUsers[activeChat.userId._id] && (
                                             <div className="inline-block px-3 py-2 bg-white rounded-lg rounded-bl-sm mb-3 text-gray-600 italic self-start">
-                                                User is typing...
+                                                User đang nhập...
                                             </div>
                                         )}
                                         <div ref={messagesEndRef} />
@@ -468,9 +656,8 @@ const AdminChats = () => {
                                 <Form form={form} onFinish={handleSendMessage} className="flex">
                                     <Form.Item name="message" className="mb-0 flex-1">
                                         <Input
-                                            placeholder="Type a message..."
-                                            suffix={<SendOutlined onClick={() => form.submit()} />}
-                                            onChange={handleInputChange}
+                                            placeholder="Nhập tin nhắn..."
+                                            suffix={<SendOutlined onClick={() => form.submit()} className="text-blue-500 cursor-pointer" />}
                                             ref={inputRef}
                                             disabled={activeChat.status === 'Closed'}
                                             onPressEnter={(e) => {
@@ -482,11 +669,25 @@ const AdminChats = () => {
                                         />
                                     </Form.Item>
                                 </Form>
+                                {!socketConnected && (
+                                    <div className="text-xs text-red-500 mt-1 text-center">
+                                        Đang kết nối lại...
+                                    </div>
+                                )}
                             </div>
                         </>
                     ) : (
-                        <div className="h-full flex justify-center items-center text-gray-500">
-                            Select a chat to start messaging
+                        <div className="h-full flex flex-col justify-center items-center text-gray-500">
+                            {sidebarCollapsed && (
+                                <Button
+                                    icon={<MenuUnfoldOutlined />}
+                                    onClick={toggleSidebar}
+                                    className="mb-4 lg:hidden"
+                                >
+                                    Hiển thị danh sách chat
+                                </Button>
+                            )}
+                            Chọn một cuộc trò chuyện để bắt đầu
                         </div>
                     )}
                 </div>

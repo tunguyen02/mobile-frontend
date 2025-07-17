@@ -20,35 +20,133 @@ const ChatBubble = () => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const [socketConnected, setSocketConnected] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+    const pollingIntervalRef = useRef(null);
+    const lastPollingTimeRef = useRef(0);
+    const pingIntervalRef = useRef(null);
+    const lastMessageTimestampRef = useRef(null);
+    const initialLoadDoneRef = useRef(false);
+    const reconnectTimeoutRef = useRef(null);
 
     const dispatch = useDispatch();
     const user = useSelector((state) => state.user);
     const { messages = [], isChatOpen = false, unreadCounts = {} } = useSelector((state) => state.chat || {});
 
-    console.log('User info in ChatBubble:', user); // Debug info
-    console.log('Chat state:', { messages, isChatOpen, unreadCounts }); // Debug chat state
 
     const totalUnread = Object.values(unreadCounts).reduce((acc, count) => acc + count, 0);
 
+    // Cập nhật timestamp khi có tin nhắn mới
+    useEffect(() => {
+        if (messages.length > 0) {
+            const latestMessage = messages[messages.length - 1];
+            if (latestMessage && latestMessage.createdAt) {
+                lastMessageTimestampRef.current = new Date(latestMessage.createdAt).toISOString();
+            }
+        }
+    }, [messages]);
+
+    // Thiết lập polling định kỳ để tự động tải tin nhắn mới - chỉ tải tin nhắn mới
+    useEffect(() => {
+        if (user.role === 'User' && user._id) {
+            const startPolling = () => {
+                if (pollingIntervalRef.current) {
+                    clearInterval(pollingIntervalRef.current);
+                }
+
+                pollingIntervalRef.current = setInterval(() => {
+                    const now = Date.now();
+                    if (initialLoadDoneRef.current && (isChatOpen || (now - lastPollingTimeRef.current > 30000))) {
+                        console.log('Polling for new messages');
+                        if (isChatOpen && lastMessageTimestampRef.current) {
+                            fetchNewMessages(lastMessageTimestampRef.current);
+                        } else if (!isChatOpen) {
+                            fetchUnreadCount();
+                        }
+                        lastPollingTimeRef.current = now;
+                    }
+                }, 500);
+            };
+
+            startPolling();
+
+            return () => {
+                if (pollingIntervalRef.current) {
+                    clearInterval(pollingIntervalRef.current);
+                }
+            };
+        }
+    }, [user._id, user.role, isChatOpen]);
+
+    // Thiết lập ping định kỳ để giữ kết nối socket
+    useEffect(() => {
+        if (user.role === 'User' && user._id && socket) {
+            const startPing = () => {
+                if (pingIntervalRef.current) {
+                    clearInterval(pingIntervalRef.current);
+                }
+
+                pingIntervalRef.current = setInterval(() => {
+                    if (socket.connected) {
+                        socket.emit('ping', { userId: user._id });
+                    } else {
+                        socket.connect();
+                        socket.emit('join', { userId: user._id, role: user.role || 'User' });
+                    }
+                }, 5000);
+            };
+
+            startPing();
+
+            return () => {
+                if (pingIntervalRef.current) {
+                    clearInterval(pingIntervalRef.current);
+                }
+            };
+        }
+    }, [user._id, user.role]);
+
     useEffect(() => {
         if (user.role === 'User') {
-            // Connect to socket
+            // Connect
             try {
                 socket.connect();
                 console.log('Socket connecting...', socket.id);
 
-                // Setup socket event listeners
+                // Lắng nghe sự kiện kết nối
                 socket.on('connect', () => {
                     console.log('Socket connected with ID:', socket.id);
+                    setSocketConnected(true);
                     socket.emit('join', { userId: user._id, role: user.role || 'User' });
                     console.log('Joined chat as:', { userId: user._id, role: user.role || 'User' });
+
+                    // Tải lại tin nhắn khi kết nối thành công
+                    if (isChatOpen) {
+                        fetchMessages();
+                    } else {
+                        fetchUnreadCount();
+                    }
+
+                    if (reconnectTimeoutRef.current) {
+                        clearTimeout(reconnectTimeoutRef.current);
+                        reconnectTimeoutRef.current = null;
+                    }
                 });
 
                 socket.on('connect_error', (err) => {
                     console.error('Socket connection error:', err);
+                    setSocketConnected(false);
                     message.error('Không thể kết nối với server chat');
+
+                    // Thử kết nối lại sau 2 giây
+                    if (!reconnectTimeoutRef.current) {
+                        reconnectTimeoutRef.current = setTimeout(() => {
+                            console.log('Attempting to reconnect after error...');
+                            socket.connect();
+                            reconnectTimeoutRef.current = null;
+                        }, 2000);
+                    }
                 });
 
                 // Socket event listeners
@@ -72,7 +170,27 @@ const ChatBubble = () => {
                     message.error(`Lỗi: ${error}`);
                 });
 
-                // Get unread message count
+                // Xử lý khi socket bị mất kết nối
+                socket.on('disconnect', (reason) => {
+                    console.log('Socket disconnected:', reason);
+                    setSocketConnected(false);
+
+                    if (!reconnectTimeoutRef.current) {
+                        reconnectTimeoutRef.current = setTimeout(() => {
+                            if (!socket.connected) {
+                                console.log('Attempting to reconnect socket...');
+                                socket.connect();
+                            }
+                            reconnectTimeoutRef.current = null;
+                        }, 2000);
+                    }
+                });
+
+                // Xử lý phản hồi từ ping
+                socket.on('pong', () => {
+                    console.log('Received pong from server');
+                });
+
                 fetchUnreadCount();
             } catch (error) {
                 console.error('Error setting up socket connection:', error);
@@ -83,10 +201,17 @@ const ChatBubble = () => {
                 console.log('Cleaning up socket connections');
                 socket.off('connect');
                 socket.off('connect_error');
+                socket.off('disconnect');
                 socket.off('newMessage');
                 socket.off('messagesRead');
                 socket.off('typing');
                 socket.off('error');
+                socket.off('pong');
+
+                if (reconnectTimeoutRef.current) {
+                    clearTimeout(reconnectTimeoutRef.current);
+                }
+
                 socket.disconnect();
             };
         }
@@ -101,13 +226,7 @@ const ChatBubble = () => {
     useEffect(() => {
         if (isChatOpen && messages.length > 0) {
             setTimeout(() => {
-                if (messagesEndRef.current) {
-                    const chatContainer = messagesEndRef.current.parentElement?.parentElement;
-                    if (chatContainer) {
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    }
-                    messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
-                }
+                forceScrollToBottom();
             }, 200);
         }
     }, [isChatOpen]);
@@ -118,6 +237,7 @@ const ChatBubble = () => {
         }
     }, [messages]);
 
+    // tải tất cả tin nhắn khi mở chat lần đầu
     const fetchMessages = async () => {
         if (!user._id) {
             console.warn('Cannot fetch messages - user._id is undefined');
@@ -129,12 +249,21 @@ const ChatBubble = () => {
             console.log('Fetching messages for user:', user._id);
             const response = await chatService.getMessages(user._id);
             console.log('Messages fetched:', response.data);
-            dispatch(setMessages(response.data?.messages || []));
 
-            if (response.data?.messages?.length) {
+            if (response.data?.messages?.length > 0) {
+                dispatch(setMessages(response.data.messages || []));
+
+                // Lưu timestamp của tin nhắn mới nhất
+                const latestMsg = response.data.messages[response.data.messages.length - 1];
+                lastMessageTimestampRef.current = new Date(latestMsg.createdAt).toISOString();
+
                 markAsRead();
-                setTimeout(scrollToBottom, 100);
+                forceScrollToBottom();
+            } else {
+                dispatch(setMessages([]));
             }
+
+            initialLoadDoneRef.current = true;
         } catch (error) {
             console.error('Error fetching messages:', error);
             message.error('Không thể tải tin nhắn');
@@ -143,6 +272,43 @@ const ChatBubble = () => {
         }
     };
 
+    // tải tin nhắn mới
+    const fetchNewMessages = async (timestamp) => {
+        if (!user._id || !timestamp) {
+            return;
+        }
+
+        try {
+            console.log('Fetching new messages after timestamp:', timestamp);
+            const response = await chatService.getNewMessages(user._id, timestamp);
+
+            if (response.data?.messages?.length > 0) {
+                console.log('New messages found:', response.data.messages.length);
+
+                const existingMessagesMap = new Map(
+                    messages.map(msg => [msg._id, true])
+                );
+
+                response.data.messages.forEach(msg => {
+                    if (!existingMessagesMap.has(msg._id)) {
+                        dispatch(addMessage(msg));
+                    }
+                });
+
+                const latestMsg = response.data.messages[response.data.messages.length - 1];
+                lastMessageTimestampRef.current = new Date(latestMsg.createdAt).toISOString();
+
+                if (isChatOpen) {
+                    markAsRead();
+                    forceScrollToBottom();
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching new messages:', error);
+        }
+    };
+
+    // tin nhắn chưa đọc
     const fetchUnreadCount = async () => {
         if (!user._id) {
             console.warn('Cannot fetch unread count - user._id is undefined');
@@ -159,6 +325,7 @@ const ChatBubble = () => {
         }
     };
 
+    // đánh dấu tin nhắn đã đọc
     const markAsRead = async () => {
         if (!user._id) {
             console.warn('Cannot mark as read - user._id is undefined');
@@ -174,32 +341,57 @@ const ChatBubble = () => {
         }
     };
 
+    // xử lý khi có tin nhắn mới
     const handleNewMessage = (data) => {
+        console.log('handleNewMessage called with:', data);
         if (!data || !data.messages || !data.messages.length) {
             console.warn('Invalid message data received:', data);
             return;
         }
 
-        // Lấy tin nhắn mới nhất
-        const latestMessage = data.messages[data.messages.length - 1];
+        const isTemporaryUpdate = data.messages.some(msg => msg.isTempId);
+
+        const newMessages = data.messages;
+
+        const latestMessage = newMessages[newMessages.length - 1];
+
+        if (latestMessage?.createdAt) {
+            lastMessageTimestampRef.current = new Date(latestMessage.createdAt).toISOString();
+        }
 
         if (isChatOpen) {
-            // Kiểm tra xem tin nhắn đã tồn tại trong messages chưa
-            const isDuplicate = messages.some(msg =>
-                msg._id && latestMessage._id && msg._id === latestMessage._id
+            const existingMessagesMap = new Map(
+                messages.map(msg => [msg._id, true])
             );
 
-            if (!isDuplicate) {
-                dispatch(addMessage(latestMessage));
+            const messagesToAdd = [];
+            newMessages.forEach(newMsg => {
+                if (newMsg.isTempId && existingMessagesMap.has(`real-${newMsg._id.replace('temp-', '')}`)) {
+                    return;
+                }
+
+                if (!existingMessagesMap.has(newMsg._id)) {
+                    messagesToAdd.push(newMsg);
+                }
+            });
+
+            if (messagesToAdd.length > 0) {
+                console.log('Adding new messages to state:', messagesToAdd);
+
+                messagesToAdd.forEach(msg => {
+                    dispatch(addMessage(msg));
+                });
+
                 markAsRead();
-            } else {
-                console.log('Duplicate message detected, ignoring:', latestMessage);
+
+                forceScrollToBottom();
             }
         } else {
             fetchUnreadCount();
         }
     };
 
+    // đánh dấu tin nhắn đã đọc
     const handleMessagesRead = (chat) => {
         dispatch(updateMessageReadStatus({ userId: user._id, readMessages: chat.messages }));
     };
@@ -208,6 +400,8 @@ const ChatBubble = () => {
         setIsTyping(isTyping);
     };
 
+
+    // gửi tin nhắn
     const handleSendMessage = async (values) => {
         if (!values.message?.trim()) return;
 
@@ -221,12 +415,10 @@ const ChatBubble = () => {
             const messageContent = values.message.trim();
             form.resetFields();
 
-            // Focus on input after sending
             if (inputRef.current) {
                 inputRef.current.focus();
             }
 
-            // Tạo tin nhắn tạm thời để hiển thị ngay
             const tempMessage = {
                 _id: `temp-${Date.now()}`,
                 sender: 'User',
@@ -234,75 +426,83 @@ const ChatBubble = () => {
                 type: 'Text',
                 isRead: false,
                 createdAt: new Date().toISOString(),
-                tempMessage: true // Đánh dấu đây là tin nhắn tạm
+                tempMessage: true
             };
 
-            // Hiển thị tin nhắn ngay lập tức trong UI
             dispatch(addMessage(tempMessage));
-            setTimeout(scrollToBottom, 50);
+            forceScrollToBottom();
 
-            // Flag để theo dõi xem tin nhắn đã được gửi thành công chưa
+            lastMessageTimestampRef.current = tempMessage.createdAt;
+
             let messageSent = false;
 
-            // Lắng nghe xác nhận gửi tin nhắn từ server
             const messageConfirmHandler = (data) => {
                 console.log('Message confirmation received:', data);
                 messageSent = true;
 
-                // Thay thế tin nhắn tạm bằng tin nhắn thật từ server
                 if (data?.messages?.length > 0) {
                     const newMessage = data.messages[data.messages.length - 1];
                     dispatch(replaceMessage({ tempId: tempMessage._id, newMessage }));
+
+                    lastMessageTimestampRef.current = newMessage.createdAt;
                 } else {
-                    // Chỉ fetch lại nếu không nhận được tin nhắn từ server
-                    fetchMessages();
+                    fetchNewMessages(lastMessageTimestampRef.current);
                 }
 
-                // Remove event listener ngay sau khi nhận được
                 socket.off('messageSent', messageConfirmHandler);
             };
 
-            // Thêm listener tạm thời
             socket.once('messageSent', messageConfirmHandler);
 
-            // Emit message
-            socket.emit('sendMessage', {
-                userId: user._id,
-                sender: 'User',
-                content: messageContent,
-                type: 'Text'
-            });
+            if (!socket.connected) {
+                console.log('Socket not connected, reconnecting...');
+                socket.connect();
 
-            console.log('Message emitted to socket');
+                socket.once('connect', () => {
+                    socket.emit('join', { userId: user._id, role: user.role || 'User' });
 
-            // Fallback if socket fails - send via API and refresh
+                    socket.emit('sendMessage', {
+                        userId: user._id,
+                        sender: 'User',
+                        content: messageContent,
+                        type: 'Text'
+                    });
+                    console.log('Message emitted to socket after reconnection');
+                });
+            } else {
+                socket.emit('sendMessage', {
+                    userId: user._id,
+                    sender: 'User',
+                    content: messageContent,
+                    type: 'Text'
+                });
+                console.log('Message emitted to socket');
+            }
+
             setTimeout(() => {
                 if (!messageSent) {
                     console.log('Socket message not confirmed, sending via API');
-                    // Hủy socket listener để tránh nhận tin nhắn trùng lặp
                     socket.off('messageSent', messageConfirmHandler);
 
                     chatService.sendMessage(user._id, messageContent)
                         .then((response) => {
                             console.log('Message sent via API:', response);
-                            // Thay thế tin nhắn tạm bằng tin nhắn từ API
                             if (response?.data?.messages?.length > 0) {
                                 const apiMessage = response.data.messages[response.data.messages.length - 1];
                                 dispatch(replaceMessage({ tempId: tempMessage._id, newMessage: apiMessage }));
+
+                                lastMessageTimestampRef.current = apiMessage.createdAt;
                             } else {
-                                // Fallback to fetching all messages
-                                fetchMessages();
+                                fetchNewMessages(lastMessageTimestampRef.current || new Date().toISOString());
                             }
                         })
                         .catch(error => {
                             console.error('Error sending message via API:', error);
                             message.error('Không thể gửi tin nhắn');
-                            // Đánh dấu tin nhắn là đã thất bại
                             dispatch(markMessageAsFailed(tempMessage._id));
                         });
                 }
-            }, 2000);
-
+            }, 800);
         } catch (error) {
             console.error('Error sending message:', error);
             message.error('Không thể gửi tin nhắn');
@@ -313,23 +513,19 @@ const ChatBubble = () => {
         if (!user._id) return;
 
         const isUserTyping = e.target.value.length > 0;
-        socket.emit('typing', { userId: user._id, isTyping: isUserTyping, sender: 'User' });
+        socket.emit('typing', {
+            userId: user._id,
+            isTyping: isUserTyping,
+            sender: 'User'
+        });
     };
 
     const toggleChat = () => {
-        const newState = !isChatOpen;
-        dispatch(setChatOpen(newState));
+        const newChatState = !isChatOpen;
+        dispatch(setChatOpen(newChatState));
 
-        if (newState) {
-            // Khi mở chat
-            fetchMessages().then(() => {
-                // Đảm bảo cuộn xuống sau khi fetch xong và render messages
-                setTimeout(scrollToBottom, 200);
-            });
-
-            if (totalUnread > 0) {
-                markAsRead();
-            }
+        if (newChatState) {
+            fetchMessages();
         }
     };
 
@@ -337,37 +533,51 @@ const ChatBubble = () => {
         if (messagesEndRef.current) {
             try {
                 messagesEndRef.current.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'end',
-                    inline: 'nearest'
+                    behavior: 'instant',
+                    block: 'end'
                 });
             } catch (error) {
                 console.error('Error scrolling to bottom:', error);
-                // Fallback nếu scrollIntoView thất bại
-                const chatContainer = messagesEndRef.current.parentElement;
-                if (chatContainer) {
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                try {
+                    const chatContainer = document.querySelector('.chat-messages');
+                    if (chatContainer) {
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                } catch (fallbackError) {
+                    console.error('Fallback scroll failed:', fallbackError);
                 }
             }
         }
     };
 
+    const forceScrollToBottom = () => {
+        setTimeout(scrollToBottom, 10);
+        setTimeout(scrollToBottom, 50);
+        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 200);
+    };
+
     const renderMessageItem = (message) => {
         const isUser = message.sender === 'User';
-
         return (
-            <div className={`mb-3 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+            <div
+                key={message._id || `temp-${Date.now()}-${Math.random()}`}
+                className={`mb-3 flex ${isUser ? 'justify-end' : 'justify-start'}`}
+            >
+                {!isUser && (
+                    <Avatar size="small" className="mr-2" icon={<UserOutlined />} />
+                )}
                 <div
-                    className={`max-w-[80%] px-3 py-2 rounded-lg ${isUser
+                    className={`max-w-[80%] sm:max-w-[70%] px-3 py-2 rounded-lg ${isUser
                         ? message.failed
                             ? 'bg-red-100 text-red-800 rounded-br-sm'
                             : message.tempMessage
                                 ? 'bg-blue-300 text-white rounded-br-sm'
-                                : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm shadow'
-                        : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
+                                : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-sm shadow-md'
+                        : 'bg-white text-gray-800 rounded-bl-sm shadow-md'
                         }`}
                 >
-                    <div className={`${isUser ? 'text-white' : 'text-gray-800'} ${message.failed ? 'text-red-800' : ''}`}>
+                    <div className={`${isUser ? 'text-white' : 'text-gray-800'} ${message.failed ? 'text-red-800' : ''} break-words`}>
                         {message.content}
                     </div>
                     <div
@@ -376,7 +586,7 @@ const ChatBubble = () => {
                                 ? 'text-red-600'
                                 : message.tempMessage
                                     ? 'text-blue-200'
-                                    : 'text-blue-100'
+                                    : 'text-blue-200'
                             : 'text-gray-500'
                             }`}
                     >
@@ -400,78 +610,87 @@ const ChatBubble = () => {
         );
     };
 
+    if (!user._id) {
+        return null;
+    }
+
     return (
-        <div className="fixed bottom-8 right-8 z-50">
-            {user.role === 'User' && (isChatOpen ? (
-                <div className="w-[350px] h-[500px] bg-white rounded-xl overflow-hidden flex flex-col shadow-lg border border-gray-200">
-                    <div className="p-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white flex justify-between items-center border-b border-gray-200">
-                        <div className="flex items-center gap-2 font-medium">
-                            <Avatar icon={<UserOutlined />} /> Support Chat
-                        </div>
+        <>
+            <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-50">
+                {!isChatOpen && (
+                    <Badge count={totalUnread} offset={[-5, 5]}>
                         <Button
-                            type="text"
-                            icon={<CloseOutlined />}
+                            type="primary"
+                            shape="circle"
+                            size="large"
+                            icon={<MessageOutlined />}
                             onClick={toggleChat}
-                            className="text-white hover:text-gray-200"
+                            className="bg-blue-500 hover:bg-blue-600 shadow-lg w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] flex items-center justify-center"
                         />
-                    </div>
+                    </Badge>
+                )}
 
-                    <div className="flex-1 p-4 overflow-y-auto bg-gray-100">
-                        {loading ? (
-                            <div className="h-full flex justify-center items-center">
-                                <Spin />
-                            </div>
-                        ) : messages.length === 0 ? (
-                            <div className="h-full flex justify-center items-center">
-                                <Text type="secondary">No messages yet. Start a conversation!</Text>
-                            </div>
-                        ) : (
-                            <div className="min-h-full">
-                                {messages.map((message, index) => (
-                                    <div key={message._id || `msg-${index}`}>
-                                        {renderMessageItem(message)}
-                                    </div>
-                                ))}
-                                {isTyping && (
-                                    <div className="inline-block px-3 py-2 bg-white rounded-lg rounded-bl-sm mb-3 text-gray-600 italic">
-                                        Admin is typing...
-                                    </div>
-                                )}
-                                <div ref={messagesEndRef} />
-                            </div>
-                        )}
-                    </div>
-
-                    <Form form={form} onFinish={handleSendMessage} className="p-3 border-t border-gray-200 bg-white">
-                        <Form.Item name="message" className="mb-0">
-                            <Input
-                                placeholder="Type a message..."
-                                suffix={<SendOutlined onClick={() => form.submit()} className="text-blue-500 cursor-pointer" />}
-                                onChange={handleInputChange}
-                                ref={inputRef}
-                                onPressEnter={(e) => {
-                                    if (!e.shiftKey) {
-                                        e.preventDefault();
-                                        form.submit();
-                                    }
-                                }}
+                {isChatOpen && (
+                    <div className="bg-white rounded-lg shadow-xl w-[300px] sm:w-[350px] h-[450px] sm:h-[500px] flex flex-col overflow-hidden">
+                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-3 flex justify-between items-center">
+                            <h3 className="m-0 font-medium text-base">Hỗ trợ trực tuyến</h3>
+                            <Button
+                                type="text"
+                                icon={<CloseOutlined />}
+                                onClick={toggleChat}
+                                className="text-white hover:text-gray-200 p-0"
                             />
-                        </Form.Item>
-                    </Form>
-                </div>
-            ) : (
-                <Badge count={totalUnread} overflowCount={99}>
-                    <Button
-                        type="primary"
-                        shape="circle"
-                        size="large"
-                        icon={<MessageOutlined />}
-                        onClick={toggleChat}
-                        className="w-[60px] h-[60px] flex justify-center items-center shadow-md bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
-                    />
-                </Badge>
-            ))}
-        </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 chat-messages">
+                            {loading ? (
+                                <div className="h-full flex justify-center items-center">
+                                    <Spin />
+                                </div>
+                            ) : messages.length === 0 ? (
+                                <div className="h-full flex justify-center items-center text-gray-500">
+                                    Hãy bắt đầu cuộc trò chuyện
+                                </div>
+                            ) : (
+                                <div className="flex flex-col">
+                                    {messages.map(renderMessageItem)}
+                                    {isTyping && (
+                                        <div className="inline-block px-3 py-2 bg-white rounded-lg rounded-bl-sm mb-3 text-gray-600 italic self-start shadow-sm">
+                                            Admin đang nhập...
+                                        </div>
+                                    )}
+                                    <div ref={messagesEndRef} />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-3 border-t border-gray-200">
+                            <Form form={form} onFinish={handleSendMessage} className="flex">
+                                <Form.Item name="message" className="mb-0 flex-1">
+                                    <Input
+                                        placeholder="Nhập tin nhắn..."
+                                        suffix={<SendOutlined onClick={() => form.submit()} className="text-blue-500 cursor-pointer" />}
+                                        ref={inputRef}
+                                        onChange={handleInputChange}
+                                        onPressEnter={(e) => {
+                                            if (!e.shiftKey) {
+                                                e.preventDefault();
+                                                form.submit();
+                                            }
+                                        }}
+                                    />
+                                </Form.Item>
+                            </Form>
+                            {!socketConnected && (
+                                <div className="text-xs text-red-500 mt-1 text-center">
+                                    Đang kết nối lại...
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
     );
 };
 

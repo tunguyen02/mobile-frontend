@@ -22,7 +22,6 @@ function OrderCard({ order }) {
         'Cancelled': 'Đã hủy'
     }
 
-    // Hàm trả về tag trạng thái đơn hàng với màu sắc tương ứng
     const renderShippingStatusTag = (status) => {
         let color = 'default';
 
@@ -47,7 +46,6 @@ function OrderCard({ order }) {
         return <Tag color={color}>{shippingStatusMap[status]}</Tag>;
     };
 
-    // Tính thời gian còn lại để thanh toán (24h kể từ khi tạo đơn)
     useEffect(() => {
         if (order?.paymentMethod === 'VNPay' && order?.paymentStatus === 'Pending') {
             const calculateTimeLeft = () => {
@@ -69,7 +67,7 @@ function OrderCard({ order }) {
             };
 
             calculateTimeLeft();
-            const timer = setInterval(calculateTimeLeft, 60000); // Cập nhật mỗi phút
+            const timer = setInterval(calculateTimeLeft, 60000);
 
             return () => clearInterval(timer);
         }
@@ -83,7 +81,6 @@ function OrderCard({ order }) {
         navigate(`/order/details/${orderId}`);
     }
 
-    // Hàm để thanh toán lại đơn hàng VNPay
     const handleRepayVNPay = async (orderId) => {
         try {
             setIsLoading(true);
@@ -106,7 +103,6 @@ function OrderCard({ order }) {
         }
     }
 
-    // Hàm chuyển sang thanh toán COD
     const handleSwitchToCOD = async (orderId) => {
         Modal.confirm({
             title: 'Chuyển sang thanh toán khi nhận hàng?',
@@ -137,7 +133,6 @@ function OrderCard({ order }) {
         });
     }
 
-    // Hàm để hủy đơn hàng
     const handleCancelOrder = async (orderId) => {
         Modal.confirm({
             title: 'Hủy đơn hàng?',
@@ -153,9 +148,7 @@ function OrderCard({ order }) {
                     if (result.success) {
                         message.success(result.message || 'Đã hủy đơn hàng thành công', 3);
 
-                        // Kiểm tra nếu có yêu cầu hoàn tiền
                         if (result.hasRefund && result.refundInfo) {
-                            // Hiển thị thông báo về hoàn tiền
                             Modal.success({
                                 title: 'Đã tạo yêu cầu hoàn tiền tự động',
                                 content: 'Đơn hàng đã thanh toán VNPay của bạn đã được hủy và hệ thống đã tự động tạo yêu cầu hoàn tiền. Bạn có muốn xem thông tin hoàn tiền không?',
@@ -169,7 +162,6 @@ function OrderCard({ order }) {
                                 }
                             });
                         } else {
-                            // Nếu không có hoàn tiền, chỉ làm mới trang
                             setTimeout(() => {
                                 window.location.reload();
                             }, 1500);
@@ -185,10 +177,8 @@ function OrderCard({ order }) {
         });
     }
 
-    // Kiểm tra xem đơn hàng có phải VNPay và chưa thanh toán không
     const isVNPayPending = order?.paymentMethod === 'VNPay' && order?.paymentStatus === 'Pending';
 
-    // Kiểm tra xem đơn hàng có thể hủy không (chỉ có thể hủy khi đơn hàng ở trạng thái Pending)
     const canCancel = order?.shippingStatus === 'Pending';
 
     return (

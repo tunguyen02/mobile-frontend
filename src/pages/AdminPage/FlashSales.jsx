@@ -39,6 +39,7 @@ const FlashSales = () => {
     const [editingFlashSale, setEditingFlashSale] = useState(null);
     const [products, setProducts] = useState([]);
     const [selectedProducts, setSelectedProducts] = useState([]);
+    const [dateRangeError, setDateRangeError] = useState(false);
     const user = useSelector((state) => state.user);
 
     const fetchFlashSales = async () => {
@@ -80,7 +81,6 @@ const FlashSales = () => {
         fetchProducts();
     }, []);
 
-    // Thêm console.log để debug
     useEffect(() => {
         console.log('Current editing flash sale:', editingFlashSale);
     }, [editingFlashSale]);
@@ -140,6 +140,25 @@ const FlashSales = () => {
             const startTime = values.timeRange[0].toDate ? values.timeRange[0].toDate().toISOString() : values.timeRange[0].toISOString();
             const endTime = values.timeRange[1].toDate ? values.timeRange[1].toDate().toISOString() : values.timeRange[1].toISOString();
 
+            if (new Date(endTime) <= new Date(startTime)) {
+                message.error('Thời gian kết thúc phải sau thời gian bắt đầu');
+                return;
+            }
+
+            const invalidPriceProducts = selectedProducts.filter(item =>
+                item.discountPrice >= item.originalPrice
+            );
+
+            if (invalidPriceProducts.length > 0) {
+                const productNames = invalidPriceProducts.map(item => {
+                    const product = products.find(p => p._id === item.productId);
+                    return product ? product.name : `Sản phẩm #${item.productId}`;
+                }).join(', ');
+
+                message.error(`Giá khuyến mãi phải thấp hơn giá gốc cho các sản phẩm: ${productNames}`);
+                return;
+            }
+
             const productsData = selectedProducts.map(item => {
                 if (editingFlashSale) {
                     const newQty = item.soldCount + item.remainingQuantity;
@@ -188,7 +207,6 @@ const FlashSales = () => {
             const errorMsg = error.response?.data?.message || error.message || 'Đã xảy ra lỗi không xác định';
             message.error('Có lỗi xảy ra: ' + errorMsg);
 
-            // Log full error details in console
             if (error.response) {
                 console.error('Error response:', error.response.data);
             }
@@ -226,6 +244,13 @@ const FlashSales = () => {
             }
         }
 
+        if (field === 'discountPrice') {
+            const originalPrice = updatedProducts[index].originalPrice;
+            if (value >= originalPrice) {
+                message.warning('Giá khuyến mãi phải thấp hơn giá gốc');
+            }
+        }
+
         setSelectedProducts(updatedProducts);
     };
 
@@ -245,10 +270,28 @@ const FlashSales = () => {
         return 'active';
     };
 
-    // Hàm định dạng tiền tệ
     const formatCurrency = (value) => {
         if (!value && value !== 0) return '';
         return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ₫';
+    };
+
+    const handleDateRangeChange = (dates) => {
+        if (!dates || !dates[0] || !dates[1]) {
+            setDateRangeError(false);
+            return;
+        }
+
+        const startDate = dates[0];
+        const endDate = dates[1];
+
+        if (endDate.isBefore(startDate) || endDate.isSame(startDate)) {
+            setDateRangeError(true);
+            message.error('Thời gian kết thúc phải sau thời gian bắt đầu');
+            // Xóa giá trị đã chọn
+            form.setFieldsValue({ timeRange: [startDate, null] });
+        } else {
+            setDateRangeError(false);
+        }
     };
 
     const columns = [
@@ -279,9 +322,7 @@ const FlashSales = () => {
             title: 'Đã bán',
             key: 'soldCount',
             render: (_, record) => {
-                // Tính tổng số sản phẩm đã bán
                 const totalSold = record.products.reduce((sum, item) => sum + (item.soldCount || 0), 0);
-                // Tính tổng số lượng sản phẩm
                 const totalQuantity = record.products.reduce((sum, item) => sum + item.quantity, 0);
                 return `${totalSold}/${totalQuantity}`;
             }
@@ -316,14 +357,12 @@ const FlashSales = () => {
                         onClick={() => {
                             console.log('Edit flash sale:', record);
                             try {
-                                // Kiểm tra dữ liệu
                                 if (!record || !record.products) {
                                     message.error('Dữ liệu flash sale không hợp lệ');
                                     console.error('Invalid record:', record);
                                     return;
                                 }
 
-                                // Kiểm tra cấu trúc sản phẩm
                                 for (const product of record.products) {
                                     if (!product.product) {
                                         message.error('Dữ liệu sản phẩm không hợp lệ');
@@ -403,12 +442,45 @@ const FlashSales = () => {
                     <Form.Item
                         name="timeRange"
                         label="Thời gian diễn ra"
-                        rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn thời gian' },
+                            ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                    if (!value || !value[0] || !value[1]) {
+                                        return Promise.resolve();
+                                    }
+                                    const startTime = value[0];
+                                    const endTime = value[1];
+                                    if (endTime.isBefore(startTime) || endTime.isSame(startTime)) {
+                                        return Promise.reject(new Error('Thời gian kết thúc phải sau thời gian bắt đầu'));
+                                    }
+                                    return Promise.resolve();
+                                },
+                            }),
+                        ]}
+                        validateStatus={dateRangeError ? 'error' : ''}
+                        help={dateRangeError ? 'Thời gian kết thúc phải sau thời gian bắt đầu' : ''}
                     >
                         <RangePicker
                             showTime
                             format="DD/MM/YYYY HH:mm"
                             placeholder={['Thời gian bắt đầu', 'Thời gian kết thúc']}
+                            onChange={handleDateRangeChange}
+                            disabledDate={(current) => {
+                                // Không cho phép chọn ngày trong quá khứ
+                                return current && current < dayjs().startOf('day');
+                            }}
+                            onCalendarChange={(dates, dateStrings, info) => {
+                                if (info.range === 'end' && dates && dates[0] && dates[1]) {
+                                    // Kiểm tra khi người dùng chọn ngày kết thúc
+                                    if (dates[1].isBefore(dates[0]) || dates[1].isSame(dates[0])) {
+                                        setDateRangeError(true);
+                                        message.error('Thời gian kết thúc phải sau thời gian bắt đầu');
+                                    } else {
+                                        setDateRangeError(false);
+                                    }
+                                }
+                            }}
                         />
                     </Form.Item>
 
@@ -455,6 +527,8 @@ const FlashSales = () => {
                                         label="Giá khuyến mãi"
                                         className="flex-1 mb-2"
                                         required
+                                        validateStatus={item.discountPrice >= item.originalPrice ? 'error' : ''}
+                                        help={item.discountPrice >= item.originalPrice ? 'Giá khuyến mãi phải thấp hơn giá gốc' : ''}
                                     >
                                         <InputNumber
                                             value={item.discountPrice}
@@ -470,6 +544,7 @@ const FlashSales = () => {
                                                 return parseFloat(value.replace(/\./g, ''));
                                             }}
                                             addonAfter="₫"
+                                            status={item.discountPrice >= item.originalPrice ? 'error' : ''}
                                         />
                                     </Form.Item>
                                 </div>
@@ -553,7 +628,7 @@ const FlashSales = () => {
                             <Button
                                 type="primary"
                                 htmlType="submit"
-                                disabled={selectedProducts.length === 0}
+                                disabled={selectedProducts.length === 0 || dateRangeError}
                             >
                                 {editingFlashSale ? "Cập nhật" : "Tạo mới"}
                             </Button>

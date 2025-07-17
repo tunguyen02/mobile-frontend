@@ -3,7 +3,6 @@ import axiosJWT from "./axiosJWT";
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const refundService = {
-    // Yêu cầu hoàn tiền
     createRefundRequest: async (accessToken, orderId, reason) => {
         try {
             const response = await axiosJWT.post(
@@ -22,7 +21,6 @@ const refundService = {
         }
     },
 
-    // Lấy danh sách yêu cầu hoàn tiền của người dùng
     getUserRefunds: async (accessToken) => {
         try {
             const response = await axiosJWT.get(`${apiUrl}/refund/my-refunds`, {
@@ -37,7 +35,6 @@ const refundService = {
         }
     },
 
-    // Xem chi tiết yêu cầu hoàn tiền
     getRefundDetails: async (accessToken, refundId) => {
         try {
             const response = await axiosJWT.get(
@@ -55,7 +52,6 @@ const refundService = {
         }
     },
 
-    // Admin lấy tất cả yêu cầu hoàn tiền
     getAllRefunds: async (accessToken) => {
         try {
             const response = await axiosJWT.get(`${apiUrl}/refund/all`, {
@@ -70,7 +66,6 @@ const refundService = {
         }
     },
 
-    // Admin phê duyệt yêu cầu hoàn tiền
     approveRefund: async (accessToken, refundId, adminNote) => {
         try {
             const response = await axiosJWT.patch(
@@ -89,7 +84,6 @@ const refundService = {
         }
     },
 
-    // Admin từ chối yêu cầu hoàn tiền
     rejectRefund: async (accessToken, refundId, reason) => {
         try {
             const response = await axiosJWT.patch(

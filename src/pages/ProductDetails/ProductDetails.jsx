@@ -36,7 +36,6 @@ const ProductDetail = () => {
     const mutationAddToCart = useMutation({
         mutationFn: () => {
             const accessToken = handleGetAccessToken();
-            // Nếu đang trong Flash Sale và còn hiệu lực, gửi thông tin Flash Sale khi thêm vào giỏ hàng
             if (flashSaleInfo && isFlashSaleValid(flashSaleInfo)) {
                 return cartService.addFlashSaleProductToCart(
                     accessToken,
@@ -59,22 +58,18 @@ const ProductDetail = () => {
 
     const { data, isPending } = mutationAddToCart;
 
-    // Kiểm tra Flash Sale có đang active hay không
     const isFlashSaleActive = () => {
         return isFlashSaleValid(flashSaleInfo);
     };
 
-    // Lấy thông tin Flash Sale từ localStorage khi component mount
     useEffect(() => {
         try {
             const storedFlashSaleInfo = localStorage.getItem(`flashSale_${productId}`);
             if (storedFlashSaleInfo) {
                 const parsedInfo = JSON.parse(storedFlashSaleInfo);
-                // Kiểm tra tính hợp lệ của Flash Sale
                 if (isFlashSaleValid(parsedInfo)) {
                     setFlashSaleInfo(parsedInfo);
                 } else {
-                    // Xóa Flash Sale hết hạn hoặc hết số lượng
                     localStorage.removeItem(`flashSale_${productId}`);
                     setFlashSaleInfo(null);
                 }
@@ -99,7 +94,6 @@ const ProductDetail = () => {
         fetchData();
     }, [productId]);
 
-    // Kiểm tra người dùng đã đánh giá sản phẩm chưa
     useEffect(() => {
         if (user && product) {
             checkUserReviewStatus();
@@ -162,7 +156,6 @@ const ProductDetail = () => {
         mutationAddToCart.mutate();
     }
 
-    // Tính giá và % giảm giá dựa trên thông tin Flash Sale hoặc giá thường
     const getPrice = () => {
         if (flashSaleInfo && isFlashSaleActive()) {
             return flashSaleInfo.discountPrice;
@@ -187,27 +180,21 @@ const ProductDetail = () => {
 
     const handleCloseReviewModal = () => {
         setReviewModal(false);
-        // Refresh trạng thái đánh giá
         checkUserReviewStatus();
     };
 
     const handleAddToCompare = () => {
-        // Lưu giá hiện tại của sản phẩm (giá sale nếu có)
         const productPrice = currentPrice;
 
-        // Xây dựng URL cho trang so sánh với sản phẩm hiện tại là sản phẩm cố định
         let compareUrl = `/product/compare?fixedId=${productId}`;
 
-        // Thêm thông tin giá
         if (productPrice) {
             compareUrl += `&price=${productPrice}`;
         }
 
-        // Nếu sản phẩm đang giảm giá, thêm thông tin giảm giá
         if (savingPercentage > 0) {
             compareUrl += `&discount=${savingPercentage}`;
 
-            // Nếu đang trong flash sale, thêm thông tin flash sale
             if (flashSaleInfo && isFlashSaleActive()) {
                 compareUrl += '&isFlashSale=true';
                 if (product?.originalPrice) {
@@ -216,7 +203,6 @@ const ProductDetail = () => {
             }
         }
 
-        // Chuyển hướng đến trang so sánh
         navigate(compareUrl);
     };
 
@@ -228,11 +214,9 @@ const ProductDetail = () => {
         return <div className="text-center p-8">Không tìm thấy sản phẩm</div>;
     }
 
-    // Chuẩn bị dữ liệu cho modal đánh giá
     let reviewModalProps = {};
     if (userReviewData) {
         if (userReviewData.hasReviewed) {
-            // Người dùng đã đánh giá, lấy thông tin đánh giá để chỉnh sửa
             const fetchUserReview = async () => {
                 try {
                     const accessToken = handleGetAccessToken();
@@ -254,11 +238,10 @@ const ProductDetail = () => {
                 orderId: userReviewData.orderId,
                 reviewId: userReviewData.reviewId,
                 isEdit: true,
-                initialValues: null, // Sẽ được cập nhật khi lấy dữ liệu đánh giá
+                initialValues: null,
                 onFetchReview: fetchUserReview
             };
         } else if (userReviewData.canReview) {
-            // Người dùng có thể đánh giá mới
             reviewModalProps = {
                 product: product,
                 orderId: userReviewData.orderId,
@@ -267,7 +250,6 @@ const ProductDetail = () => {
         }
     }
 
-    // Đường dẫn ảnh chính
     const mainImageUrl = product.imageUrl[selectedImageIndex];
 
     return (

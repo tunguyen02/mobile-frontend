@@ -17,7 +17,6 @@ const PriceFilterButton = ({ filters, setFilters }) => {
         60000000: '60tr'
     };
 
-    // Cập nhật giá trị tạm thời khi popover mở
     const handlePopoverOpen = (visible) => {
         if (visible && filters.priceRange) {
             const [min, max] = filters.priceRange.split('-').map(Number);
@@ -27,7 +26,6 @@ const PriceFilterButton = ({ filters, setFilters }) => {
             setInputPriceMin(0);
             setInputPriceMax(60000000);
         } else {
-            // Khi đóng popover, cập nhật filter tạm thời vào state chính
             let updatedPriceRange = '';
             if (inputPriceMin > 0 || inputPriceMax < 60000000) {
                 updatedPriceRange = `${inputPriceMin}-${inputPriceMax}`;
@@ -80,7 +78,6 @@ const PriceFilterButton = ({ filters, setFilters }) => {
         </div>
     );
 
-    // Hiển thị giá đã chọn
     const getPriceRangeText = () => {
         if (!filters.priceRange) return "";
         const [min, max] = filters.priceRange.split('-').map(Number);

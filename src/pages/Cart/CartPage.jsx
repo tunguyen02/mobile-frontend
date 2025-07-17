@@ -37,6 +37,8 @@ const CartPage = () => {
     const [flashSaleProducts, setFlashSaleProducts] = useState({});
     const [isRedirecting, setIsRedirecting] = useState(false);
 
+
+    // lấy sp flash sale từ localStorage
     useEffect(() => {
         const flashSaleItems = {};
 
@@ -65,6 +67,7 @@ const CartPage = () => {
         setFlashSaleProducts(flashSaleItems);
     }, [cart]);
 
+    // Cập nhật giỏ hàng nếu có sản phẩm Flash Sale
     useEffect(() => {
         if (Object.keys(flashSaleProducts).length > 0 && cart?.products?.length > 0) {
             let needsUpdate = false;

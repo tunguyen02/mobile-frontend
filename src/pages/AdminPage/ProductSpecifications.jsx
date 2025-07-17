@@ -18,13 +18,11 @@ const ProductSpecifications = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Fetch product details to get the name
                 const productData = await productService.getProductById(productId);
                 if (productData && productData.product) {
                     setProductName(productData.product.name);
                 }
 
-                // Fetch specifications
                 const specifications = await productDetailService.getProductDetail(productId);
                 if (specifications) {
                     form.setFieldsValue(specifications.data);

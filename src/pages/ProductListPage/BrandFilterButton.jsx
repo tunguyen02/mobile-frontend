@@ -5,7 +5,6 @@ const BrandFilterButton = ({ brands = [], filters, setFilters }) => {
     const [popoverVisible, setPopoverVisible] = useState(false);
     const [tempSelectedBrands, setTempSelectedBrands] = useState(filters.selectedBrands || []);
 
-    // Debug log
     useEffect(() => {
         console.log("BrandFilterButton received brands:", brands);
         console.log("BrandFilterButton brands type:", typeof brands);
@@ -15,12 +14,10 @@ const BrandFilterButton = ({ brands = [], filters, setFilters }) => {
         }
     }, [brands]);
 
-    // Cập nhật giá trị tạm thời khi popover mở
     const handlePopoverOpen = (visible) => {
         if (visible) {
             setTempSelectedBrands(filters.selectedBrands || []);
         } else {
-            // Khi đóng popover, cập nhật filter tạm thời vào state chính
             setFilters(prev => ({
                 ...prev,
                 selectedBrands: tempSelectedBrands

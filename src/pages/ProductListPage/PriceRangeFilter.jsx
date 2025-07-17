@@ -3,17 +3,14 @@ import { Slider, InputNumber, Space, Button, Popover } from "antd";
 import { formatCurrency } from "../../utils/utils";
 
 const PriceRangeFilter = ({ priceRange, setPriceRange }) => {
-    // Giá tối thiểu và tối đa (VND)
     const MIN_PRICE = 0;
     const MAX_PRICE = 60000000;
-    const STEP = 500000; // Khoảng cách 500.000 VND
+    const STEP = 500000;
 
-    // State tạm thời cho giá trị được hiển thị và chỉnh sửa
     const [tempMinPrice, setTempMinPrice] = useState(MIN_PRICE);
     const [tempMaxPrice, setTempMaxPrice] = useState(MAX_PRICE);
     const [popoverVisible, setPopoverVisible] = useState(false);
 
-    // Khởi tạo giá trị ban đầu từ URL params nếu có
     useEffect(() => {
         if (priceRange) {
             const [min, max] = priceRange.split('-').map(price => parseInt(price));
@@ -24,38 +21,32 @@ const PriceRangeFilter = ({ priceRange, setPriceRange }) => {
         }
     }, []);
 
-    // Xử lý khi thanh trượt thay đổi - chỉ cập nhật state tạm thời
     const handleSliderChange = (values) => {
         setTempMinPrice(values[0]);
         setTempMaxPrice(values[1]);
     };
 
-    // Xử lý khi nhấn nút áp dụng
     const handleApplyFilter = () => {
         setPriceRange(`${tempMinPrice}-${tempMaxPrice}`);
         setPopoverVisible(false);
     };
 
-    // Xử lý khi input min thay đổi
     const handleMinInputChange = (value) => {
         if (value === null) return;
         const newMinPrice = Math.max(MIN_PRICE, value);
         setTempMinPrice(newMinPrice);
     };
 
-    // Xử lý khi input max thay đổi
     const handleMaxInputChange = (value) => {
         if (value === null) return;
         const newMaxPrice = Math.min(MAX_PRICE, value);
         setTempMaxPrice(newMaxPrice);
     };
 
-    // Format giá trị hiển thị trên thanh trượt
     const formatTooltip = (value) => {
         return `${formatCurrency(value)} đ`;
     };
 
-    // Nội dung của popover
     const popoverContent = (
         <div className="w-[350px] p-3">
             <div className="mb-4">
